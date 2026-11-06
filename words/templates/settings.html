@@ -28,6 +28,7 @@
   <nav class="settings-nav" aria-label="设置分区">
     <a href="#sec-learning" data-tab="sec-learning" class="active"><i class="ph ph-sliders-horizontal"></i> 学习偏好</a>
     <a href="#sec-ai" data-tab="sec-ai"><i class="ph ph-cpu"></i> AI 与模型</a>
+    <a href="#sec-cost" data-tab="sec-cost"><i class="ph ph-coins"></i> AI 成本</a>
     <a href="#sec-display" data-tab="sec-display"><i class="ph ph-palette"></i> 外观与主题</a>
     <a href="#sec-data" data-tab="sec-data"><i class="ph ph-database"></i> 数据备份与恢复</a>
     <a href="#sec-privacy" data-tab="sec-privacy"><i class="ph ph-shield-check"></i> 隐私与许可</a>
@@ -248,6 +249,60 @@
       </div>
     </div>
 
+    <!-- ============ AI 成本追踪 ============ -->
+    <div class="card" id="sec-cost">
+      <div class="card-header"><i class="ph ph-coins" style="color: var(--c-amber);"></i> AI 成本追踪</div>
+      
+      <p class="settings-sub">
+        查看 AI 调用成本统计。成本根据模型和 token 用量估算，仅供参考。
+      </p>
+
+      <div class="flex gap-2" style="margin-bottom: 16px; flex-wrap: wrap;">
+        <button class="btn btn-secondary btn-sm cost-period-btn" data-period="day" onclick="loadCostStats('day')">今日</button>
+        <button class="btn btn-secondary btn-sm cost-period-btn" data-period="week" onclick="loadCostStats('week')">本周</button>
+        <button class="btn btn-primary btn-sm cost-period-btn active" data-period="month" onclick="loadCostStats('month')">本月</button>
+        <button class="btn btn-secondary btn-sm cost-period-btn" data-period="all" onclick="loadCostStats('all')">全部</button>
+      </div>
+
+      <div class="stat-grid" style="margin-bottom: 16px;">
+        <div class="stat-card">
+          <div class="stat-card-head">
+            <span class="stat-icon stat-icon--blue"><i class="ph ph-paper-plane-tilt"></i></span>
+            <span class="about-stat-title">调用次数</span>
+          </div>
+          <div class="stat-value" id="costTotalCalls">-</div>
+          <div class="stat-label">次 AI 调用</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-head">
+            <span class="stat-icon stat-icon--green"><i class="ph ph-coins"></i></span>
+            <span class="about-stat-title">估算成本</span>
+          </div>
+          <div class="stat-value" id="costTotalUsd" style="color: var(--c-amber);">-</div>
+          <div class="stat-label">美元 (USD)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-head">
+            <span class="stat-icon stat-icon--purple"><i class="ph ph-text-aa"></i></span>
+            <span class="about-stat-title">Token 用量</span>
+          </div>
+          <div class="stat-value" id="costTotalTokens">-</div>
+          <div class="stat-label">输入 + 输出</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <div class="form-label" style="margin-bottom: 8px;">按功能分类</div>
+        <div id="costByAction" class="flex flex-col" style="gap: 6px;">
+          <div class="text-secondary text-sm">加载中...</div>
+        </div>
+      </div>
+
+      <div class="form-help" style="margin-top: 16px;">
+        <i class="ph ph-info"></i> 成本根据模型官方定价估算，实际费用可能因缓存、折扣等因素略有差异。
+      </div>
+    </div>
+
     <!-- ============ 数据管理 ============ -->
     <div class="card" id="sec-data">
       <div class="card-header"><i class="ph ph-database" style="color: var(--c-blue);"></i> 数据管理</div>
@@ -257,6 +312,12 @@
           <div class="action-head"><i class="ph ph-download-simple"></i> 备份数据</div>
           <div class="action-desc">下载所有学习进度、设置、打卡记录（含词汇本数据）</div>
           <button class="btn btn-primary btn-sm" onclick="backupData(event)">下载备份</button>
+        </div>
+
+        <div class="action-item">
+          <div class="action-head"><i class="ph ph-export"></i> 导出我的数据</div>
+          <div class="action-desc">导出个人学习数据（不含词库和 AI 配置），便于移植和存档</div>
+          <a href="/api/export-my-data/" class="btn btn-secondary btn-sm" download>导出数据</a>
         </div>
 
         <div class="action-item">
@@ -738,7 +799,7 @@ document.addEventListener('keydown', function (e) {
 // 旧版页面用 URL 锚点直达分区（如 #ai-models），这里统一换成标签切换，
 // 并把上次看的分区记在本机，下次打开直接回到那一个。
 var SETTINGS_TAB_KEY = 'vocab-settings-tab';
-var SETTINGS_TABS = ['sec-learning', 'sec-ai', 'sec-display', 'sec-data', 'sec-privacy', 'sec-about'];
+var SETTINGS_TABS = ['sec-learning', 'sec-ai', 'sec-cost', 'sec-display', 'sec-data', 'sec-privacy', 'sec-about'];
 // 兼容旧锚点：其它页面深链过来的 hash 可能不是分区 id，
 // 旧分区「发音（sec-speech）/日均目标（sec-daily）」已并入「学习偏好（sec-learning）」
 var SETTINGS_LEGACY_HASH = { 'ai-models': 'sec-ai', 'sec-speech': 'sec-learning', 'sec-daily': 'sec-learning' };
@@ -1328,5 +1389,53 @@ async function testSavedModel(id) {
     refreshModelHealth(id);
   }
 }
+
+// ===== AI 成本追踪 =====
+async function loadCostStats(period) {
+  // 更新按钮状态
+  document.querySelectorAll('.cost-period-btn').forEach(btn => {
+    btn.classList.remove('active', 'btn-primary');
+    btn.classList.add('btn-secondary');
+  });
+  const activeBtn = document.querySelector(`.cost-period-btn[data-period="${period}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active', 'btn-primary');
+    activeBtn.classList.remove('btn-secondary');
+  }
+
+  try {
+    const res = await fetch(`/api/ai-cost-stats/?period=${period}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '加载失败');
+
+    document.getElementById('costTotalCalls').textContent = data.total_calls.toLocaleString();
+    document.getElementById('costTotalUsd').textContent = '$' + (data.total_cost || 0).toFixed(4);
+    const totalTokens = (data.total_input_tokens || 0) + (data.total_output_tokens || 0);
+    document.getElementById('costTotalTokens').textContent = totalTokens.toLocaleString();
+
+    const byActionEl = document.getElementById('costByAction');
+    if (data.by_action && data.by_action.length > 0) {
+      byActionEl.innerHTML = data.by_action.map(item => `
+        <div class="flex justify-between items-center" style="padding: 8px 12px; background: var(--c-bg); border-radius: 6px;">
+          <span>${escapeHtml(item.label)}</span>
+          <span class="text-secondary">
+            ${item.calls} 次 · <span style="color: var(--c-amber);">$${item.cost.toFixed(4)}</span>
+          </span>
+        </div>
+      `).join('');
+    } else {
+      byActionEl.innerHTML = '<div class="text-secondary text-sm">暂无调用记录</div>';
+    }
+  } catch (e) {
+    console.error('Failed to load cost stats:', e);
+    document.getElementById('costTotalCalls').textContent = '-';
+    document.getElementById('costTotalUsd').textContent = '-';
+    document.getElementById('costTotalTokens').textContent = '-';
+    document.getElementById('costByAction').innerHTML = '<div class="text-secondary text-sm" style="color: var(--c-red);">加载失败</div>';
+  }
+}
+
+// 页面加载时获取本月统计
+document.addEventListener('DOMContentLoaded', () => loadCostStats('month'));
 </script>
 {% endblock %}

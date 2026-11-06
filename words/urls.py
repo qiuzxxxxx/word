@@ -23,6 +23,7 @@ urlpatterns = [
     path('favorites/', views.favorites_list, name='favorites_list'),
     path('word-cloud/', views.mastered_word_cloud, name='word_cloud'),
     path('weak-words/', views.weak_words, name='weak_words'),
+    path('error-patterns/', views.error_patterns, name='error_patterns'),
     # 待复核队列（HANDOVER 第八节相位 3）：AI 不可用期间的判定暂存与补判/人工改判
     path('pending-reviews/', views.pending_reviews_page, name='pending_reviews'),
     path('api/pending-judgments/', views.api_pending_judgments, name='api_pending_judgments'),
@@ -161,4 +162,9 @@ urlpatterns = [
     path('api/exam/export-pdf/', views.api_exam_export_pdf, name='api_exam_export_pdf'),
     path('api/exam/phrase-toggle/', views.api_exam_phrase_toggle, name='api_exam_phrase_toggle'),
     path('api/exam/logs/', views.api_exam_logs, name='api_exam_logs'),
+    path('api/onboarding/complete/', views.api_onboarding_complete, name='api_onboarding_complete'),
+    path('api/ai-cost-stats/', views.api_ai_cost_stats, name='api_ai_cost_stats'),
+    path('api/export-my-data/', views.api_export_my_data, name='api_export_my_data'),
+    path('api/error-patterns/ai-analysis/', views.api_error_patterns_ai_analysis, name='api_error_patterns_ai_analysis'),
+    path('api/achievements/', views.api_achievements, name='api_achievements'),
 ]

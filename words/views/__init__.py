@@ -32,17 +32,21 @@ from django.utils.dateparse import parse_datetime
 from django.db import IntegrityError
 from django.views.decorators.http import require_http_methods
 
-from .secret_vault import VaultError, decrypt as decrypt_secret, encrypt as encrypt_secret
+from ..secret_vault import VaultError, decrypt as decrypt_secret, encrypt as encrypt_secret
+from .update import (
+    api_check_update, api_update_download, api_update_download_status,
+    api_update_download_cancel, api_update_result, api_update_result_ack,
+)
 
 logger = logging.getLogger(__name__)
 
-from .models import (Unit, Word, StudyProgress, StudyPlan,
+from ..models import (Unit, Word, StudyProgress, StudyPlan,
                      DailyCheckIn, Favorite, Note, QuickMemory, DailyPick, PickRecord, PickRecordWord, AIModel, AIModelHealth, PendingJudgment, StudySession, UserSettings, ChatMessage, ImportLog, Conversation, LearningReport, StudyRecord, StudyPreset, ExamQuestion, WritingPractice, WritingPhrase, AICallLog, TranslationSentence, TranslationPractice, TranslationFavorite, GeneratedPaper, GeneratedQuestion,
                      Cet6TranslationPassage, Cet6TranslationPractice,
                      GeneratedCet6Paper, GeneratedCet6Question,
                      PosLearningAttempt, PosLessonCache, WordFamily, WordFamilyMember,
                      WordFormationPattern, WordRelation, KnowledgeFeedback)
-from .ai_prompts import (
+from ..ai_prompts import (
     quick_memory_prompt, ASSISTANT_SYSTEM_PROMPT, assistant_word_context,
     pos_grouping_prompt, examples_prompt, phonetics_prompt,
     RECOGNIZE_JSON_SCHEMA, RECOGNIZE_COMMON_RULES,
@@ -51,7 +55,7 @@ from .ai_prompts import (
     pos_lesson_prompt, pos_open_grade_prompt, word_family_candidate_prompt,
     POS_LESSON_PROMPT_VERSION,
 )
-from .ai_exam_prompts import (
+from ..ai_exam_prompts import (
     build_vocabulary_profile, essay_generation_prompt, essay_grading_prompt,
     translation_help_prompt, translation_grading_prompt, themes_report_prompt,
     personal_template_prompt, cet6_translation_help_prompt, cet6_translation_grading_prompt,
@@ -205,6 +209,11 @@ def dashboard(request):
         'heatmap_days': heatmap_days,
         'total_study_days': total_study_days,
         'today_duration': today_duration,
+        # 新手引导状态：无学习记录且未完成引导时显示
+        'show_onboarding': (
+            not request.session.get('onboarding_done')
+            and StudyProgress.objects.count() == 0
+        ),
     }
     return render(request, 'dashboard.html', context)
 
@@ -1183,6 +1192,182 @@ def weak_words(request):
         'stats': stats,
         'selected_count': len(items),
         'pool_count': len(pool),
+    })
+
+
+def error_patterns(request):
+    """错误模式分析：可视化用户的错误数据，展示常见错误类型、混淆词对、错误趋势等。
+    复用 StudyRecord.mistake_type、WordRelation(confusing)、KnowledgeFeedback 数据。"""
+    from django.db.models import Count as DbCount
+    from collections import Counter, defaultdict
+    from datetime import timedelta
+
+    # 时间范围筛选（默认 30 天）
+    try:
+        days = int(request.GET.get('days', 30))
+        if days < 1 or days > 365:
+            days = 30
+    except (TypeError, ValueError):
+        days = 30
+
+    since = timezone.now() - timedelta(days=days)
+
+    # 1. 错误类型分布（从 StudyRecord.mistake_type）
+    mistake_type_stats = list(
+        StudyRecord.objects
+        .filter(created_at__gte=since, mistake_type__gt='')
+        .exclude(action__in=['known', 'spelling_ok', 'meaning_ok', 'skip'])
+        .values('mistake_type')
+        .annotate(count=DbCount('id'))
+        .order_by('-count')
+    )
+    mistake_type_labels = dict(StudyRecord.MISTAKE_CHOICES)
+    mistake_type_data = [
+        {
+            'type': item['mistake_type'],
+            'label': mistake_type_labels.get(item['mistake_type'], item['mistake_type']),
+            'count': item['count'],
+        }
+        for item in mistake_type_stats
+    ]
+
+    # 2. 高频错误词 TOP 20
+    error_word_stats = list(
+        StudyRecord.objects
+        .filter(created_at__gte=since)
+        .exclude(action__in=['known', 'spelling_ok', 'meaning_ok', 'skip'])
+        .values('word_id', 'word__word', 'word__pos')
+        .annotate(error_count=DbCount('id'))
+        .order_by('-error_count')[:20]
+    )
+    top_error_words = [
+        {
+            'word_id': item['word_id'],
+            'word': item['word__word'],
+            'pos': item['word__pos'] or '',
+            'error_count': item['error_count'],
+        }
+        for item in error_word_stats
+    ]
+
+    # 3. 混淆词对分析（从 WordRelation rel_type='confusing'）
+    confusing_pairs = list(
+        WordRelation.objects
+        .filter(rel_type='confusing', is_confirmed=True)
+        .select_related('word', 'related_word')
+        .values(
+            'id', 'word__word', 'word__id',
+            'related_word__word', 'related_word__id',
+            'note'
+        )[:50]
+    )
+    # 为每个混淆对统计实际错误次数
+    confusion_stats = []
+    for pair in confusing_pairs:
+        w1_id = pair['word__id']
+        w2_id = pair['related_word__id']
+        if not w1_id or not w2_id:
+            continue
+        # 统计这两个词之间的混淆错误（用户在 w1 上错了，正确答案是 w2，或反之）
+        error_count = StudyRecord.objects.filter(
+            Q(word_id=w1_id) | Q(word_id=w2_id),
+            created_at__gte=since,
+            mistake_type='meaning_confusion'
+        ).count()
+        confusion_stats.append({
+            'id': pair['id'],
+            'word1': pair['word__word'],
+            'word2': pair['related_word__word'] or '',
+            'note': pair['note'] or '',
+            'error_count': error_count,
+        })
+    confusion_stats.sort(key=lambda x: -x['error_count'])
+
+    # 4. 错误趋势（按周统计近 N 天的错误数）
+    weekly_trend = defaultdict(lambda: {'total': 0, 'spelling': 0, 'meaning': 0, 'confusion': 0})
+    records = StudyRecord.objects.filter(
+        created_at__gte=since
+    ).exclude(
+        action__in=['known', 'spelling_ok', 'meaning_ok', 'skip']
+    ).values('created_at', 'mistake_type')
+
+    for rec in records:
+        dt = rec['created_at']
+        if dt is None:
+            continue
+        # 按周分组（ISO 周）
+        week_key = dt.strftime('%Y-W%W')
+        weekly_trend[week_key]['total'] += 1
+        mt = rec.get('mistake_type', '')
+        if mt == 'spelling':
+            weekly_trend[week_key]['spelling'] += 1
+        elif mt in ('meaning', 'meaning_confusion'):
+            weekly_trend[week_key]['meaning'] += 1
+            if mt == 'meaning_confusion':
+                weekly_trend[week_key]['confusion'] += 1
+
+    trend_data = [
+        {'week': week, **counts}
+        for week, counts in sorted(weekly_trend.items())
+    ]
+
+    # 5. 用户标记的重点知识（从 KnowledgeFeedback action='focus'）
+    focus_items = list(
+        KnowledgeFeedback.objects
+        .filter(action='focus')
+        .order_by('-created_at')[:30]
+    )
+    focus_words = []
+    for fb in focus_items:
+        if fb.target_type == 'word':
+            w = Word.objects.filter(id=fb.target_id).first()
+            if w:
+                focus_words.append({
+                    'type': '单词',
+                    'name': w.word,
+                    'pos': w.pos or '',
+                    'meanings': w.get_meanings()[:2],
+                })
+        elif fb.target_type == 'family':
+            f = WordFamily.objects.filter(id=fb.target_id).first()
+            if f:
+                focus_words.append({
+                    'type': '词族',
+                    'name': f.title,
+                    'description': f.description[:50],
+                })
+        elif fb.target_type == 'pattern':
+            p = WordFormationPattern.objects.filter(id=fb.target_id).first()
+            if p:
+                focus_words.append({
+                    'type': '构词法',
+                    'name': p.name,
+                    'description': p.rule[:50] if p.rule else '',
+                })
+
+    # 6. 汇总统计
+    total_errors = StudyRecord.objects.filter(
+        created_at__gte=since
+    ).exclude(
+        action__in=['known', 'spelling_ok', 'meaning_ok', 'skip']
+    ).count()
+
+    summary = {
+        'days': days,
+        'total_errors': total_errors,
+        'mistake_types': len(mistake_type_data),
+        'confusion_pairs': len(confusion_stats),
+        'focus_items': len(focus_words),
+    }
+
+    return render(request, 'error_patterns.html', {
+        'summary': summary,
+        'mistake_type_data': mistake_type_data,
+        'top_error_words': top_error_words,
+        'confusion_stats': confusion_stats[:20],
+        'trend_data': trend_data,
+        'focus_words': focus_words,
+        'days': days,
     })
 
 
@@ -3175,299 +3360,6 @@ def api_privacy_agree(request):
         'text_hash': text_hash,
     })
 
-
-GITHUB_LATEST_RELEASE_API = (
-    'https://api.github.com/repos/'
-    '1826548016-cloud/Lexizx/releases/latest'
-)
-# 主站 Atom 订阅源：走 github.com 而非 api.github.com，不受未授权 API
-# 配额（60 次/小时，出口 IP 共享时常被占满 → 403）限制，国内也更稳。
-GITHUB_RELEASES_ATOM = (
-    'https://github.com/1826548016-cloud/Lexizx/releases.atom'
-)
-RELEASE_PAGE = ('https://github.com/1826548016-cloud/'
-                'Lexizx/releases/latest')
-
-
-def _parse_version(text):
-    """'v3.4.0' / '3.4.0-beta' -> (3, 4, 0)；解析失败返回 None"""
-    m = re.search(r'(\d+)\.(\d+)\.(\d+)', str(text or ''))
-    return tuple(int(x) for x in m.groups()) if m else None
-
-
-def _http_get_json(url, timeout=6):
-    req = urllib.request.Request(
-        url,
-        headers={
-            'Accept': 'application/json',
-            'User-Agent': 'Postgraduate-Vocabulary-App',
-        },
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read(5 * 1024 * 1024 + 1).decode('utf-8'))
-
-
-def _http_get_text(url, timeout=8):
-    req = urllib.request.Request(
-        url,
-        headers={
-            'Accept': 'application/atom+xml, text/html;q=0.9',
-            'User-Agent': 'Mozilla/5.0 (compatible; '
-                          'Postgraduate-Vocabulary-App)',
-        },
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read(512 * 1024 + 1).decode('utf-8', 'ignore')
-
-
-def _release_html_to_text(raw):
-    """Release 说明的 HTML 片段 -> 弹窗 <pre> 可读的纯文本"""
-    text = re.sub(r'<\s*br\s*/?\s*>', '\n', raw, flags=re.I)
-    text = re.sub(r'<\s*li[^>]*>', '· ', text, flags=re.I)
-    text = re.sub(r'</\s*(p|li|h[1-6]|div)\s*>', '\n', text, flags=re.I)
-    text = re.sub(r'<[^>]+>', '', text)
-    return re.sub(r'\n{3,}', '\n\n', unescape(text)).strip()
-
-
-def _latest_release_from_atom(attempts=(3, 4, 5)):
-    """从 github.com 的 Releases Atom 订阅源解析最新 Release。
-    该通道走 github.com 主站（不受 API 配额限制），但本机到 github.com
-    偶发连接被重置（SSL UNEXPECTED_EOF），故做多次快速重试；全失败返回 None"""
-    ns = '{http://www.w3.org/2005/Atom}'
-    for timeout in attempts:
-        try:
-            root = ET.fromstring(_http_get_text(GITHUB_RELEASES_ATOM, timeout=timeout))
-            entry = root.find(ns + 'entry')
-            if entry is None:
-                continue
-            link = entry.find(ns + 'link')
-            html_url = (link.get('href') or '') if link is not None else ''
-            title = (entry.findtext(ns + 'title') or '').strip()
-            tag = html_url.rsplit('/tag/', 1)[-1] if '/tag/' in html_url else ''
-            return {
-                'tag_name': tag or title,
-                'name': title,
-                'body': _release_html_to_text(entry.findtext(ns + 'content') or ''),
-                'html_url': html_url or RELEASE_PAGE,
-                'published_at': (entry.findtext(ns + 'updated') or '')[:10],
-            }
-        except Exception:
-            continue
-    return None
-
-
-def api_check_update(request):
-    """检查是否有新版本：优先读 github.com 的 Releases Atom 订阅源，
-    失败时回退官方 Release API。两者都不可达时友好返回，不抛错。"""
-    current = settings.APP_VERSION
-    cur_tuple = _parse_version(current)
-
-    data = _latest_release_from_atom()
-    if not data:
-        # 回退官方 Release API（国内偶发被重置，失败时递增超时重试）
-        for timeout in (6, 8):
-            try:
-                data = _http_get_json(GITHUB_LATEST_RELEASE_API, timeout=timeout)
-                break
-            except urllib.error.HTTPError as e:
-                # 403 = 未授权配额耗尽，重试无意义，立即放弃
-                if e.code == 403:
-                    break
-                data = None
-            except Exception:
-                data = None
-    if not data:
-        return JsonResponse({
-            'success': False,
-            'current': 'v' + current,
-            'error': '无法连接更新服务器（GitHub），请检查网络后重试',
-        })
-    try:
-        latest_tag = data.get('tag_name') or ''
-        if not _parse_version(latest_tag):
-            raise ValueError('bad tag')
-        payload = {
-            'latest': latest_tag,
-            'release_title': data.get('name') or '',
-            'release_notes': data.get('body') or '',
-            'html_url': data.get('html_url') or RELEASE_PAGE,
-            'published_at': (data.get('published_at') or '')[:10],
-        }
-    except Exception:
-        return JsonResponse({
-            'success': False,
-            'current': 'v' + current,
-            'error': '更新服务器返回数据异常，请稍后重试',
-        })
-
-    new_tuple = _parse_version(payload['latest'])
-    payload.update({
-        'success': True,
-        'current': 'v' + current,
-        'has_update': bool(new_tuple and cur_tuple and new_tuple > cur_tuple),
-    })
-    return JsonResponse(payload)
-
-
-# ===== 自动更新：下载 / 校验 / 安装状态 =====
-# 只用模块级 dict + 锁管理单个下载任务（本机单用户，无需数据库或额外服务）。
-_UPDATE_LOCK = threading.Lock()
-_UPDATE_CANCEL = threading.Event()
-_UPDATE_STATE = {
-    'state': 'idle',          # idle/starting/downloading/verifying/ready/cancelled/error
-    'tag': '',
-    'downloaded': 0,
-    'total': 0,
-    'percent': 0,
-    'message': '',
-    'error': '',
-    'path': '',
-    'sha_expected': None,
-    'sha_ok': None,
-}
-
-
-def _update_dir():
-    d = Path(settings.DATA_DIR) / 'update'
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _update_status_path():
-    return Path(settings.DATA_DIR) / 'update' / 'last_update.json'
-
-
-def _set_update_state(**kwargs):
-    with _UPDATE_LOCK:
-        _UPDATE_STATE.update(kwargs)
-
-
-def _update_snapshot():
-    with _UPDATE_LOCK:
-        data = dict(_UPDATE_STATE)
-    data['desktop'] = bool(getattr(settings, 'FROZEN', False))
-    return data
-
-
-def _download_update_worker(tag):
-    """后台下载 + 校验；状态只写内存，下载完成后写一次最终状态"""
-    import updater as updater_core
-
-    dest = _update_dir() / f'word-{tag}.exe'
-    last_tick = [0.0]
-
-    def progress(done, total):
-        now = time.time()
-        if total and done < total and now - last_tick[0] < 0.3:
-            return
-        last_tick[0] = now
-        _set_update_state(downloaded=done, total=total,
-                          percent=int(done * 100 / total) if total else 0)
-
-    try:
-        exe_url, _ = updater_core.asset_urls(tag)
-        _set_update_state(state='downloading', message='正在下载新版本…',
-                          downloaded=0, total=0, percent=0, error='', path='',
-                          sha_expected=None, sha_ok=None)
-        size = updater_core.download_file(
-            exe_url, dest, progress=progress, cancel=_UPDATE_CANCEL)
-        _set_update_state(state='verifying', message='正在校验文件…',
-                          downloaded=size, total=size, percent=100)
-
-        try:
-            expected = updater_core.fetch_expected_sha(tag)
-        except Exception as e:
-            raise updater_core.UpdateError('无法取得 SHA-256 校验值，已拒绝安装') from e
-        if not updater_core.verify_sha256(dest, expected):
-            raise updater_core.UpdateError('SHA-256 校验未通过，已拒绝安装')
-        _set_update_state(state='ready', message='校验通过，可以安装',
-                          path=str(dest), sha_expected=expected, sha_ok=True)
-    except updater_core.UpdateCancelled:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        _set_update_state(state='cancelled', message='已取消下载', path='')
-    except urllib.error.HTTPError as e:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        if e.code == 404:
-            hint = '该版本尚未发布安装包（Release 缺少 word.exe），请前往 Release 页面确认'
-        elif e.code == 403:
-            hint = '下载被 GitHub 限流（HTTP 403），请稍后再试'
-        else:
-            hint = f'下载失败（HTTP {e.code}），请稍后重试'
-        _set_update_state(state='error', message='下载失败', error=hint, path='')
-    except Exception as e:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        _set_update_state(state='error', message='下载失败', error=str(e), path='')
-
-
-@require_http_methods(['POST'])
-def api_update_download(request):
-    """开始下载指定版本的新 EXE（POST-only，下载在后台线程）"""
-    import updater as updater_core
-    try:
-        payload = json.loads(request.body.decode('utf-8') or '{}')
-    except Exception:
-        payload = {}
-    try:
-        tag = updater_core.normalize_tag(payload.get('tag'))
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
-
-    with _UPDATE_LOCK:
-        if _UPDATE_STATE['state'] in ('starting', 'downloading', 'verifying'):
-            return JsonResponse({'success': False, 'error': '已有下载任务进行中',
-                                 'state': _UPDATE_STATE['state']}, status=409)
-        _UPDATE_STATE.update(state='starting', tag=tag, downloaded=0, total=0,
-                             percent=0, message='准备下载…', error='', path='',
-                             sha_expected=None, sha_ok=None)
-    _UPDATE_CANCEL.clear()
-    threading.Thread(target=_download_update_worker, args=(tag,), daemon=True).start()
-    return JsonResponse({'success': True, 'state': 'starting', 'tag': tag})
-
-
-@require_http_methods(['GET'])
-def api_update_download_status(request):
-    return JsonResponse(_update_snapshot())
-
-
-@require_http_methods(['POST'])
-def api_update_download_cancel(request):
-    _UPDATE_CANCEL.set()
-    return JsonResponse({'success': True})
-
-
-@require_http_methods(['GET'])
-def api_update_result(request):
-    """上次更新的结果（安装成功 / 已回滚），确认过就不再重复提示"""
-    import updater as updater_core
-    data = updater_core.read_status(_update_status_path())
-    if not data or data.get('state') not in ('done', 'rolled_back', 'failed'):
-        return JsonResponse({'has_result': False})
-    if request.session.get('update_result_seen') == data.get('at'):
-        return JsonResponse({'has_result': False})
-    return JsonResponse({
-        'has_result': True,
-        'state': data.get('state'),
-        'message': data.get('message') or '',
-        'at': data.get('at') or '',
-    })
-
-
-@require_http_methods(['POST'])
-def api_update_result_ack(request):
-    import updater as updater_core
-    data = updater_core.read_status(_update_status_path())
-    if data:
-        request.session['update_result_seen'] = data.get('at')
-    return JsonResponse({'success': True})
 
 
 
@@ -11062,3 +10954,340 @@ def word_family_candidates_page(request):
                 .prefetch_related('members__word', 'patterns', 'relations__related_word')
                 .order_by('-created_at'))
     return render(request, 'word_family_candidates.html', {'families': families})
+
+
+def api_onboarding_complete(request):
+    """标记新手引导完成（POST-only）"""
+    if request.method == 'POST':
+        request.session['onboarding_done'] = True
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+
+def api_ai_cost_stats(request):
+    """获取 AI 调用成本统计"""
+    from django.db.models import Sum, Count
+    from datetime import timedelta
+    from decimal import Decimal
+    
+    period = request.GET.get('period', 'month')  # day/week/month/all
+    
+    now = timezone.now()
+    if period == 'day':
+        since = now - timedelta(days=1)
+    elif period == 'week':
+        since = now - timedelta(weeks=1)
+    elif period == 'month':
+        since = now - timedelta(days=30)
+    else:
+        since = None
+    
+    qs = AICallLog.objects.filter(success=True)
+    if since:
+        qs = qs.filter(created_at__gte=since)
+    
+    stats = qs.aggregate(
+        total_calls=Count('id'),
+        total_input_tokens=Sum('input_tokens'),
+        total_output_tokens=Sum('output_tokens'),
+        total_cost=Sum('cost_usd'),
+    )
+    
+    # 按功能分组统计
+    by_action = list(
+        qs.values('action')
+        .annotate(calls=Count('id'), cost=Sum('cost_usd'))
+        .order_by('-cost')[:10]
+    )
+    
+    action_labels = dict(AICallLog.ACTION_CHOICES)
+    for item in by_action:
+        item['label'] = action_labels.get(item['action'], item['action'])
+        item['cost'] = float(item['cost'] or 0)
+    
+    return JsonResponse({
+        'success': True,
+        'period': period,
+        'total_calls': stats['total_calls'] or 0,
+        'total_input_tokens': stats['total_input_tokens'] or 0,
+        'total_output_tokens': stats['total_output_tokens'] or 0,
+        'total_cost': float(stats['total_cost'] or 0),
+        'by_action': by_action,
+    })
+
+
+def api_export_my_data(request):
+    """导出用户个人数据（标准化格式，便于移植和存档）
+    
+    导出内容：
+    - 学习进度（StudyProgress）
+    - 背词记录（StudyRecord）
+    - 打卡记录（DailyCheckIn）
+    - 收藏单词（Favorite）
+    - 笔记（Note）
+    - 速记卡片（QuickMemory）
+    - 学习计划（StudyPlan）
+    - 自选词组（PickRecord）
+    
+    不包含：词库本体（太大）、AI 模型配置（含密钥）、会话记录
+    """
+    from django.core.serializers.json import DjangoJSONEncoder
+    
+    settings_obj = UserSettings.get_settings()
+    
+    export_data = {
+        'format_version': '1.0',
+        'exported_at': timezone.localtime().isoformat(),
+        'app_version': settings.APP_VERSION,
+        'user_settings': {
+            'font_size': settings_obj.font_size,
+            'theme': settings_obj.theme,
+            'daily_new_target': settings_obj.daily_new_target,
+            'daily_review_target': settings_obj.daily_review_target,
+            'batch_size': settings_obj.batch_size,
+        },
+        'progress': [
+            {
+                'word': p.word.word,
+                'unit_number': p.word.unit.number if p.word.unit else None,
+                'status': p.status,
+                'mastery_level': p.mastery_level,
+                'error_count': p.error_count,
+                'review_count': p.review_count,
+                'learned_date': p.learned_date.isoformat() if p.learned_date else None,
+                'next_review': p.next_review.isoformat() if p.next_review else None,
+            }
+            for p in StudyProgress.objects.select_related('word__unit').all()
+        ],
+        'study_records': [
+            {
+                'word': r.word.word,
+                'action': r.action,
+                'source': r.source,
+                'mode': r.mode,
+                'mistake_type': r.mistake_type,
+                'error_detail': r.error_detail,
+                'created_at': r.created_at.isoformat(),
+            }
+            for r in StudyRecord.objects.select_related('word').all()
+        ],
+        'checkins': [
+            {
+                'date': c.date.isoformat(),
+                'new_words_learned': c.new_words_learned,
+                'words_reviewed': c.words_reviewed,
+                'study_duration': c.study_duration,
+                'correct_rate': c.correct_rate,
+                'is_checked': c.is_checked,
+            }
+            for c in DailyCheckIn.objects.all()
+        ],
+        'favorites': [
+            {
+                'word': f.word.word,
+                'created_at': timezone.localtime(f.created_at).isoformat(),
+            }
+            for f in Favorite.objects.select_related('word').all()
+        ],
+        'notes': [
+            {
+                'word': n.word.word,
+                'content': n.content,
+                'page_number': n.page_number,
+            }
+            for n in Note.objects.select_related('word').all()
+        ],
+        'quick_memories': [
+            {
+                'word': qm.word.word,
+                'content': qm.content,
+                'created_at': qm.created_at.isoformat(),
+            }
+            for qm in QuickMemory.objects.select_related('word').all()
+        ],
+        'plans': [
+            {
+                'name': p.name,
+                'daily_new_words': p.daily_new_words,
+                'daily_review_count': p.daily_review_count,
+                'target_date': p.target_date.isoformat() if p.target_date else None,
+                'unit_range': p.unit_range,
+                'is_active': p.is_active,
+                'start_date': p.start_date.isoformat() if p.start_date else None,
+            }
+            for p in StudyPlan.objects.all()
+        ],
+        'pick_records': [
+            {
+                'name': r.name,
+                'created_at': r.created_at.isoformat(),
+                'words': [
+                    {'word': m.word.word, 'position': m.position}
+                    for m in r.words.select_related('word').order_by('position', 'id')
+                    if m.word
+                ],
+            }
+            for r in PickRecord.objects.all()
+        ],
+    }
+    
+    response = JsonResponse(export_data, encoder=DjangoJSONEncoder, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+    response['Content-Disposition'] = f'attachment; filename="lexizx_my_data_{timezone.localdate().isoformat()}.json"'
+    return response
+
+
+def api_error_patterns_ai_analysis(request):
+    """使用 AI 分析用户的错误模式并生成个性化讲解"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    
+    from words.llm_service import llm_service, LLMCallError
+    from words.models import UserSettings
+    
+    # 获取用户选择的 AI 模型
+    settings_obj = UserSettings.get_settings()
+    model_pk = settings_obj.review_model_id
+    if not model_pk:
+        # 回退到第一个启用的模型
+        model_pk = AIModel.objects.filter(enabled=True).values_list('id', flat=True).first()
+    
+    if not model_pk:
+        return JsonResponse({'success': False, 'error': '请先在设置中配置 AI 模型'})
+    
+    # 收集错误数据
+    from django.db.models import Count as DbCount
+    from collections import Counter
+    
+    # 近 30 天错误统计
+    since = timezone.now() - timedelta(days=30)
+    
+    # 错误类型分布
+    mistake_stats = list(
+        StudyRecord.objects
+        .filter(created_at__gte=since, mistake_type__gt='')
+        .exclude(action__in=['known', 'spelling_ok', 'meaning_ok', 'skip'])
+        .values('mistake_type')
+        .annotate(count=DbCount('id'))
+        .order_by('-count')
+    )
+    
+    # 高频错误词
+    top_error_words = list(
+        StudyRecord.objects
+        .filter(created_at__gte=since)
+        .exclude(action__in=['known', 'spelling_ok', 'meaning_ok', 'skip'])
+        .values('word__word', 'word__pos')
+        .annotate(count=DbCount('id'))
+        .order_by('-count')[:15]
+    )
+    
+    # 构造提示词
+    mistake_labels = dict(StudyRecord.MISTAKE_CHOICES)
+    mistake_summary = '\n'.join([
+        f"- {mistake_labels.get(m['mistake_type'], m['mistake_type'])}: {m['count']} 次"
+        for m in mistake_stats
+    ]) or "暂无数据"
+    
+    word_summary = '\n'.join([
+        f"- {w['word__word']} ({w['word__pos'] or '未标注'}): {w['count']} 次错误"
+        for w in top_error_words
+    ]) or "暂无数据"
+    
+    total_errors = sum(m['count'] for m in mistake_stats)
+    
+    prompt = f"""你是一位专业的英语学习顾问。请根据以下用户的错误模式数据，提供个性化的学习分析和建议。
+
+## 用户近 30 天错误统计
+
+### 错误类型分布（共 {total_errors} 次）
+{mistake_summary}
+
+### 高频错误词 TOP 15
+{word_summary}
+
+## 请提供：
+
+1. **问题诊断**：分析用户的主要薄弱环节（如拼写、释义混淆、词性等）
+2. **规律发现**：指出错误中可能存在的规律（如某些词根词缀容易混淆）
+3. **针对性建议**：给出 3-5 条具体的改进建议
+4. **推荐练习**：建议适合该用户的学习方法或练习类型
+
+请用中文回答，语言亲切友好，像一位耐心的老师。回答控制在 500 字以内。"""
+    
+    try:
+        result = llm_service.chat(
+            action='error_pattern_analysis',
+            model_pk=model_pk,
+            prompt=prompt,
+            max_tokens=2000,
+            temperature=0.7,
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'analysis': result['content'],
+            'model_used': result['model_id'],
+            'duration_ms': result['duration_ms'],
+            'cost': result.get('cost', {}).get('total_cost'),
+        })
+    
+    except LLMCallError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'reason_code': e.reason_code,
+        })
+    except Exception as e:
+        logger.exception('AI error pattern analysis failed')
+        return JsonResponse({
+            'success': False,
+            'error': f'AI 分析失败: {str(e)[:100]}',
+        })
+
+
+def api_achievements(request):
+    """获取用户成就列表"""
+    from words.achievements import get_user_achievements, get_recent_achievements
+    
+    # 获取或创建匿名用户（使用固定 ID）
+    from django.contrib.auth.models import User
+    user, _ = User.objects.get_or_create(
+        id=1,
+        defaults={'username': 'local_user', 'is_active': False}
+    )
+    
+    all_achievements = get_user_achievements(user)
+    recent = get_recent_achievements(user, limit=5)
+    
+    unlocked_count = sum(1 for a in all_achievements if a['unlocked'])
+    total_count = len(all_achievements)
+    
+    return JsonResponse({
+        'success': True,
+        'unlocked_count': unlocked_count,
+        'total_count': total_count,
+        'recent': [
+            {
+                'key': a.achievement.key,
+                'name': a.achievement.name,
+                'description': a.achievement.description,
+                'icon': a.achievement.icon,
+                'category': a.achievement.category,
+                'unlocked_at': a.unlocked_at.isoformat() if a.unlocked_at else None,
+            }
+            for a in recent
+        ],
+        'all': [
+            {
+                'key': a['achievement'].key,
+                'name': a['achievement'].name,
+                'description': a['achievement'].description,
+                'icon': a['achievement'].icon,
+                'category': a['achievement'].category,
+                'threshold': a['achievement'].threshold,
+                'unlocked': a['unlocked'],
+                'unlocked_at': a['unlocked_at'].isoformat() if a['unlocked_at'] else None,
+            }
+            for a in all_achievements
+        ],
+    })

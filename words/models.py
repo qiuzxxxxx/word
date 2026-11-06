@@ -1355,6 +1355,11 @@ class AICallLog(models.Model):
         help_text='记录提示词前 500 字，便于追溯')
     response_preview = models.TextField(blank=True, default='', verbose_name='响应预览',
         help_text='记录响应前 500 字')
+    # 成本追踪字段
+    input_tokens = models.IntegerField(default=0, verbose_name='输入 tokens')
+    output_tokens = models.IntegerField(default=0, verbose_name='输出 tokens')
+    cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0,
+        verbose_name='成本（美元）')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='调用时间')
 
     class Meta:
@@ -1364,3 +1369,66 @@ class AICallLog(models.Model):
 
     def __str__(self):
         return f'{self.get_action_display()} - {self.success}'
+
+
+class Achievement(models.Model):
+    """学习成就定义"""
+    BADGE_ICONS = [
+        ('ph-fire', '火焰'),
+        ('ph-star', '星星'),
+        ('ph-trophy', '奖杯'),
+        ('ph-medal', '奖牌'),
+        ('ph-lightning', '闪电'),
+        ('ph-target', '目标'),
+        ('ph-book-open', '书本'),
+        ('ph-graduation-cap', '毕业帽'),
+        ('ph-crown', '皇冠'),
+        ('ph-diamond', '钻石'),
+    ]
+    CATEGORY_CHOICES = [
+        ('streak', '连续打卡'),
+        ('words', '单词数量'),
+        ('accuracy', '正确率'),
+        ('time', '学习时长'),
+        ('special', '特殊成就'),
+    ]
+    
+    key = models.CharField(max_length=50, unique=True, verbose_name='成就标识')
+    name = models.CharField(max_length=100, verbose_name='成就名称')
+    description = models.TextField(verbose_name='成就描述')
+    icon = models.CharField(max_length=30, default='ph-star', choices=BADGE_ICONS, verbose_name='图标')
+    category = models.CharField(max_length=20, default='special', choices=CATEGORY_CHOICES, verbose_name='分类')
+    # 解锁条件
+    threshold = models.IntegerField(default=1, verbose_name='阈值',
+        help_text='解锁所需的数值（如天数、单词数、百分比等）')
+    condition_type = models.CharField(max_length=30, default='count', verbose_name='条件类型',
+        help_text='如: streak_days, words_learned, accuracy, study_minutes')
+    # 显示顺序
+    sort_order = models.IntegerField(default=0, verbose_name='排序')
+    is_active = models.BooleanField(default=True, verbose_name='启用')
+    
+    class Meta:
+        ordering = ['sort_order', 'id']
+        verbose_name = '成就'
+        verbose_name_plural = '成就'
+    
+    def __str__(self):
+        return self.name
+
+
+class UserAchievement(models.Model):
+    """用户已解锁的成就"""
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE,
+        related_name='achievements', verbose_name='用户')
+    achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE,
+        related_name='user_achievements', verbose_name='成就')
+    unlocked_at = models.DateTimeField(auto_now_add=True, verbose_name='解锁时间')
+    
+    class Meta:
+        unique_together = ('user', 'achievement')
+        ordering = ['-unlocked_at']
+        verbose_name = '用户成就'
+        verbose_name_plural = '用户成就'
+    
+    def __str__(self):
+        return f'{self.user} - {self.achievement.name}'

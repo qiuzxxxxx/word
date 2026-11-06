@@ -7,6 +7,108 @@
 {% block content %}
 {% csrf_token %}
 
+<!-- 新手引导弹窗 -->
+{% if show_onboarding %}
+<div class="onboarding-modal" id="onboardingModal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+  <div class="onboarding-content">
+    <div class="onboarding-step" id="onboardingStep1">
+      <div class="onboarding-icon">
+        <i class="ph ph-hand-waving"></i>
+      </div>
+      <h2 id="onboardingTitle">欢迎使用 Lexizx！</h2>
+      <p class="onboarding-desc">这是一个帮你高效背诵考研单词的学习助手。让我们花一分钟了解一下如何使用它。</p>
+      <div class="onboarding-features">
+        <div class="onboarding-feature">
+          <i class="ph ph-book-open-text"></i>
+          <span>每日背单词，自动安排复习</span>
+        </div>
+        <div class="onboarding-feature">
+          <i class="ph ph-chart-line-up"></i>
+          <span>追踪学习进度，分析错误模式</span>
+        </div>
+        <div class="onboarding-feature">
+          <i class="ph ph-brain"></i>
+          <span>AI 辅助讲解，个性化学习</span>
+        </div>
+      </div>
+      <button class="btn btn-primary onboarding-btn" onclick="nextOnboardingStep(2)">
+        开始了解 <i class="ph ph-arrow-right"></i>
+      </button>
+    </div>
+
+    <div class="onboarding-step hidden" id="onboardingStep2">
+      <div class="onboarding-icon">
+        <i class="ph ph-target"></i>
+      </div>
+      <h2>设置你的学习目标</h2>
+      <p class="onboarding-desc">建议从每天 20-30 个新词开始，系统会自动安排复习。</p>
+      <div class="onboarding-targets">
+        <label class="onboarding-target">
+          <input type="radio" name="dailyTarget" value="20">
+          <span class="target-label">
+            <strong>20 词/天</strong>
+            <small>轻松起步</small>
+          </span>
+        </label>
+        <label class="onboarding-target selected">
+          <input type="radio" name="dailyTarget" value="30" checked>
+          <span class="target-label">
+            <strong>30 词/天</strong>
+            <small>推荐</small>
+          </span>
+        </label>
+        <label class="onboarding-target">
+          <input type="radio" name="dailyTarget" value="50">
+          <span class="target-label">
+            <strong>50 词/天</strong>
+            <small>冲刺模式</small>
+          </span>
+        </label>
+      </div>
+      <div class="onboarding-actions">
+        <button class="btn btn-secondary" onclick="nextOnboardingStep(1)">
+          <i class="ph ph-arrow-left"></i> 上一步
+        </button>
+        <button class="btn btn-primary" onclick="nextOnboardingStep(3)">
+          下一步 <i class="ph ph-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="onboarding-step hidden" id="onboardingStep3">
+      <div class="onboarding-icon">
+        <i class="ph ph-rocket-launch"></i>
+      </div>
+      <h2>准备开始！</h2>
+      <p class="onboarding-desc">你可以随时在设置中调整目标。现在就开始你的第一个单词吧！</p>
+      <div class="onboarding-next-steps">
+        <a href="{% url 'words:learn_start' %}" class="onboarding-action-link">
+          <i class="ph ph-book-open-text"></i>
+          <span>开始背单词</span>
+        </a>
+        <a href="{% url 'words:word_list' %}" class="onboarding-action-link">
+          <i class="ph ph-list"></i>
+          <span>浏览词库</span>
+        </a>
+        <a href="{% url 'words:settings_page' %}" class="onboarding-action-link">
+          <i class="ph ph-gear"></i>
+          <span>更多设置</span>
+        </a>
+      </div>
+      <button class="btn btn-primary onboarding-btn" onclick="completeOnboarding()">
+        完成引导 <i class="ph ph-check"></i>
+      </button>
+    </div>
+
+    <div class="onboarding-progress">
+      <span class="progress-dot active" data-step="1"></span>
+      <span class="progress-dot" data-step="2"></span>
+      <span class="progress-dot" data-step="3"></span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- 每日一句：静态、低干扰、可关闭（不使用自动滚动横幅） -->
 <div class="daily-quote" id="dailyQuote" role="note">
   <i class="ph ph-sparkle"></i>
@@ -167,7 +269,29 @@
       <p class="text-secondary" style="margin: 0;">复习易错词，精准补漏，快速提升正确率</p>
     </div>
   </div>
-  <a href="{% url 'words:weak_words' %}" class="btn btn-secondary btn-sm">去巩固薄弱词 →</a>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a href="{% url 'words:weak_words' %}" class="btn btn-secondary btn-sm">去巩固薄弱词 →</a>
+    <a href="{% url 'words:error_patterns' %}" class="btn btn-secondary btn-sm"><i class="ph ph-chart-pie-slice"></i> 错误分析</a>
+  </div>
+</div>
+</section>
+
+<!-- 学习成就 -->
+<section class="stack" aria-label="学习成就">
+<div class="card" id="achievementsCard">
+  <div class="flex justify-between items-center" style="margin-bottom: 12px;">
+    <div class="card-header" style="margin: 0; display: flex; align-items: center; gap: 6px;">
+      <i class="ph ph-trophy"></i> 学习成就
+      <span class="text-sm text-secondary" id="achievementCount" style="font-weight: normal; margin-left: 4px;">加载中...</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="toggleAllAchievements()">查看全部</button>
+  </div>
+  <div id="recentAchievements" class="flex" style="gap: 12px; flex-wrap: wrap; min-height: 60px;">
+    <div class="text-secondary text-sm">正在加载成就数据...</div>
+  </div>
+  <div id="allAchievements" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--c-border-light);">
+    <div class="achievement-grid" id="achievementGrid"></div>
+  </div>
 </div>
 </section>
 
@@ -243,6 +367,66 @@
 
 {% block extra_scripts %}
 <script>
+  // ===== 新手引导 =====
+  function nextOnboardingStep(step) {
+    // 隐藏所有步骤
+    document.querySelectorAll('.onboarding-step').forEach(function(el) {
+      el.classList.add('hidden');
+    });
+    // 显示目标步骤
+    var target = document.getElementById('onboardingStep' + step);
+    if (target) target.classList.remove('hidden');
+    // 更新进度点
+    document.querySelectorAll('.progress-dot').forEach(function(dot) {
+      dot.classList.remove('active');
+      if (parseInt(dot.dataset.step) === step) dot.classList.add('active');
+    });
+    // 如果是第2步，绑定目标选择事件
+    if (step === 2) {
+      document.querySelectorAll('.onboarding-target input').forEach(function(input) {
+        input.addEventListener('change', function() {
+          document.querySelectorAll('.onboarding-target').forEach(function(t) {
+            t.classList.remove('selected');
+          });
+          this.closest('.onboarding-target').classList.add('selected');
+        });
+      });
+    }
+  }
+
+  function completeOnboarding() {
+    // 获取用户选择的目标
+    var selectedTarget = document.querySelector('.onboarding-target input:checked');
+    var dailyTarget = selectedTarget ? parseInt(selectedTarget.value) : 30;
+    
+    // 发送完成引导的请求
+    fetch('{% url "words:api_onboarding_complete" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      body: JSON.stringify({ daily_target: dailyTarget })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // 隐藏引导弹窗
+      var modal = document.getElementById('onboardingModal');
+      if (modal) modal.classList.add('hidden');
+      // 如果设置了目标，可以跳转到学习页面
+      if (dailyTarget > 0) {
+        // 可选：更新设置或跳转到学习页
+        // window.location.href = '{% url "words:learn_start" %}';
+      }
+    })
+    .catch(function(err) {
+      console.error('Failed to complete onboarding:', err);
+      // 即使失败也隐藏弹窗，避免阻塞用户
+      var modal = document.getElementById('onboardingModal');
+      if (modal) modal.classList.add('hidden');
+    });
+  }
+
   // Today's date in Chinese
   (function () {
     var options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
@@ -501,6 +685,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     renderCheckinHeatmap();
     updateTodayDuration();
+    loadAchievements();
     // 前台轮询服务端累计值；离开仪表盘时不估算时间。
     setInterval(updateTodayDuration, 30000);
   });
@@ -536,6 +721,95 @@
       })
       .catch(function () {})
       .then(function () { durationRequestPending = false; });
+  }
+
+  // ===== 学习成就 =====
+  async function loadAchievements() {
+    try {
+      const res = await fetch('/api/achievements/?cache=' + Date.now());
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      
+      document.getElementById('achievementCount').textContent = 
+        `${data.unlocked_count} / ${data.total_count} 已解锁`;
+      
+      const recentEl = document.getElementById('recentAchievements');
+      if (data.recent && data.recent.length > 0) {
+        recentEl.innerHTML = data.recent.map(a => `
+          <div class="achievement-badge unlocked" title="${escapeHtml(a.description)}">
+            <i class="ph ${a.icon}"></i>
+            <span class="achievement-name">${escapeHtml(a.name)}</span>
+          </div>
+        `).join('');
+      } else {
+        recentEl.innerHTML = `
+          <div class="text-secondary text-sm" style="padding: 12px 0;">
+            <i class="ph ph-info"></i> 还没有解锁的成就，继续学习吧！
+          </div>
+        `;
+      }
+      
+      window._allAchievements = data.all;
+    } catch (e) {
+      console.error('Failed to load achievements:', e);
+      document.getElementById('recentAchievements').innerHTML = 
+        '<div class="text-secondary text-sm">加载失败</div>';
+    }
+  }
+  
+  function toggleAllAchievements() {
+    const allEl = document.getElementById('allAchievements');
+    const isHidden = allEl.style.display === 'none';
+    
+    if (isHidden) {
+      allEl.style.display = 'block';
+      renderAchievementGrid();
+    } else {
+      allEl.style.display = 'none';
+    }
+  }
+  
+  function renderAchievementGrid() {
+    const grid = document.getElementById('achievementGrid');
+    if (!window._allAchievements) {
+      grid.innerHTML = '<div class="text-secondary text-sm">加载中...</div>';
+      return;
+    }
+    
+    const categories = {
+      'streak': { label: '连续打卡', icon: 'ph-fire' },
+      'words': { label: '单词数量', icon: 'ph-book-open' },
+      'accuracy': { label: '正确率', icon: 'ph-target' },
+      'time': { label: '学习时长', icon: 'ph-lightning' },
+      'special': { label: '特殊成就', icon: 'ph-star' },
+    };
+    
+    let html = '';
+    for (const [cat, info] of Object.entries(categories)) {
+      const items = window._allAchievements.filter(a => a.category === cat);
+      if (items.length === 0) continue;
+      
+      html += `<div class="achievement-category" style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <i class="ph ${info.icon}"></i> ${info.label}
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">`;
+      
+      for (const a of items) {
+        const unlockedClass = a.unlocked ? 'unlocked' : 'locked';
+        html += `
+          <div class="achievement-badge ${unlockedClass}" title="${escapeHtml(a.description)}">
+            <i class="ph ${a.icon}"></i>
+            <span class="achievement-name">${escapeHtml(a.name)}</span>
+            ${a.unlocked ? '<span class="achievement-check"><i class="ph ph-check"></i></span>' : ''}
+          </div>
+        `;
+      }
+      
+      html += '</div></div>';
+    }
+    
+    grid.innerHTML = html;
   }
 </script>
 {% endblock %}

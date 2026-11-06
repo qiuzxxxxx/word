@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}错误模式分析 - 考研单词背诵系统{% endblock %}
+{% block page_title %}错误模式分析{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="flex justify-between items-center" style="margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+  <h2 style="margin: 0; font-size: var(--fs-xl); display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-chart-pie-slice" style="color: var(--c-primary);"></i> 错误模式分析
+    <span class="text-sm text-secondary" style="font-weight: 400;">近 {{ days }} 天的错误数据洞察</span>
+  </h2>
+  <div class="flex" style="gap: 8px; flex-wrap: wrap;">
+    <a href="?days=7" class="btn btn-secondary btn-sm {% if days == 7 %}active{% endif %}">7天</a>
+    <a href="?days=30" class="btn btn-secondary btn-sm {% if days == 30 %}active{% endif %}">30天</a>
+    <a href="?days=90" class="btn btn-secondary btn-sm {% if days == 90 %}active{% endif %}">90天</a>
+    <a href="{% url 'words:weak_words' %}" class="btn btn-secondary btn-sm">
+      <i class="ph ph-warning-circle"></i> 薄弱词
+    </a>
+    <button type="button" class="btn btn-primary btn-sm" id="aiAnalysisBtn" onclick="requestAiAnalysis()">
+      <i class="ph ph-brain"></i> AI 分析我的错误
+    </button>
+  </div>
+</div>
+
+<!-- AI 分析结果区域 -->
+<div class="card" id="aiAnalysisCard" style="margin-bottom: 20px; display: none;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-brain" style="color: var(--c-primary);"></i> AI 个性化学习建议
+    <span class="text-sm text-secondary" id="aiAnalysisMeta" style="margin-left: auto;"></span>
+  </div>
+  <div id="aiAnalysisContent" style="padding: 16px; line-height: 1.8; white-space: pre-wrap;"></div>
+</div>
+
+<!-- 汇总统计 -->
+<div class="stat-grid" style="margin-bottom: 20px;">
+  <div class="card stat-card">
+    <div class="card-header" style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+      <i class="ph ph-x-circle ph-sm"></i> 总错误数
+    </div>
+    <div class="stat-value">{{ summary.total_errors }}</div>
+    <div class="stat-label">近 {{ days }} 天</div>
+  </div>
+  <div class="card stat-card">
+    <div class="card-header" style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+      <i class="ph ph-list-bullets ph-sm"></i> 错误类型
+    </div>
+    <div class="stat-value">{{ summary.mistake_types }}</div>
+    <div class="stat-label">种不同类型</div>
+  </div>
+  <div class="card stat-card">
+    <div class="card-header" style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+      <i class="ph ph-arrows-left-right ph-sm"></i> 混淆词对
+    </div>
+    <div class="stat-value">{{ summary.confusion_pairs }}</div>
+    <div class="stat-label">组易混词</div>
+  </div>
+  <div class="card stat-card">
+    <div class="card-header" style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+      <i class="ph ph-star ph-sm"></i> 关注重点
+    </div>
+    <div class="stat-value">{{ summary.focus_items }}</div>
+    <div class="stat-label">个标记项</div>
+  </div>
+</div>
+
+<!-- 错误类型分布 -->
+{% if mistake_type_data %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-chart-bar"></i> 错误类型分布
+  </div>
+  <div style="padding: 16px 0;">
+    {% for item in mistake_type_data %}
+    <div style="margin-bottom: 12px;">
+      <div class="flex justify-between" style="margin-bottom: 4px;">
+        <span style="font-weight: 500;">{{ item.label }}</span>
+        <span class="text-secondary">{{ item.count }} 次</span>
+      </div>
+      <div style="background: var(--c-bg); border-radius: 4px; height: 20px; overflow: hidden;">
+        {% widthratio item.count summary.total_errors 100 as pct %}
+        <div style="background: var(--c-primary); height: 100%; width: {% if pct < 5 %}5{% else %}{{ pct }}{% endif %}%; transition: width 0.3s;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 高频错误词 TOP 20 -->
+{% if top_error_words %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-warning"></i> 高频错误词 TOP 20
+  </div>
+  <div style="overflow-x: auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>单词</th>
+          <th>词性</th>
+          <th>错误次数</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in top_error_words %}
+        <tr>
+          <td>
+            <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; 
+              {% if forloop.counter <= 3 %}background: var(--c-red); color: white;{% else %}background: var(--c-bg);{% endif %}
+              font-size: 12px; font-weight: 600;">
+              {{ forloop.counter }}
+            </span>
+          </td>
+          <td>
+            <a href="{% url 'words:word_detail' item.word_id %}" style="font-weight: 500; color: var(--c-primary);">
+              {{ item.word }}
+            </a>
+          </td>
+          <td><span class="badge badge-secondary">{{ item.pos }}</span></td>
+          <td>
+            <span style="color: var(--c-red); font-weight: 600;">{{ item.error_count }}</span>
+            <span class="text-secondary">次</span>
+          </td>
+          <td>
+            <a href="{% url 'words:word_detail' item.word_id %}" class="btn btn-sm btn-secondary">
+              <i class="ph ph-eye"></i> 查看
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- 混淆词对分析 -->
+{% if confusion_stats %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-arrows-left-right"></i> 混淆词对分析
+    <span class="text-sm text-secondary" style="font-weight: 400;">这些词容易互相混淆</span>
+  </div>
+  <div style="padding: 16px 0;">
+    {% for pair in confusion_stats %}
+    <div style="display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; 
+                background: var(--c-bg); border-radius: 8px; border-left: 3px solid var(--c-amber);">
+      <div style="flex: 1;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span style="font-weight: 600; font-size: 1.05em;">{{ pair.word1 }}</span>
+          <i class="ph ph-arrows-left-right" style="color: var(--c-amber);"></i>
+          <span style="font-weight: 600; font-size: 1.05em;">{{ pair.word2 }}</span>
+          {% if pair.error_count > 0 %}
+          <span class="badge badge-red">{{ pair.error_count }} 次混淆</span>
+          {% endif %}
+        </div>
+        {% if pair.note %}
+        <div class="text-sm text-secondary" style="margin-top: 4px;">
+          <i class="ph ph-info"></i> {{ pair.note }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 错误趋势 -->
+{% if trend_data %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-chart-line-up"></i> 错误趋势（按周）
+  </div>
+  <div style="overflow-x: auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>周</th>
+          <th>总错误</th>
+          <th>拼写错误</th>
+          <th>释义错误</th>
+          <th>义项混淆</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in trend_data %}
+        <tr>
+          <td style="font-weight: 500;">{{ week.week }}</td>
+          <td>
+            <span style="font-weight: 600; color: {% if week.total > 10 %}var(--c-red){% elif week.total > 5 %}var(--c-amber){% else %}var(--c-green){% endif %};">
+              {{ week.total }}
+            </span>
+          </td>
+          <td>{{ week.spelling }}</td>
+          <td>{{ week.meaning }}</td>
+          <td>{{ week.confusion }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- 用户标记的重点 -->
+{% if focus_words %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 8px;">
+    <i class="ph ph-star"></i> 我标记的重点知识
+  </div>
+  <div style="padding: 16px 0;">
+    {% for item in focus_words %}
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px; margin-bottom: 8px; 
+                background: var(--c-bg); border-radius: 8px;">
+      <span class="badge badge-primary">{{ item.type }}</span>
+      <div style="flex: 1;">
+        <div style="font-weight: 600;">{{ item.name }}</div>
+        {% if item.pos %}
+        <span class="text-sm text-secondary">{{ item.pos }}</span>
+        {% endif %}
+        {% if item.description %}
+        <div class="text-sm text-secondary" style="margin-top: 2px;">{{ item.description }}</div>
+        {% endif %}
+        {% if item.meanings %}
+        <div class="text-sm" style="margin-top: 2px; color: var(--c-text);">
+          {% for m in item.meanings %}{{ m }}{% if not forloop.last %}; {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 空状态 -->
+{% if summary.total_errors == 0 %}
+<div class="card" style="text-align: center; padding: 48px 24px;">
+  <i class="ph ph-check-circle" style="font-size: 48px; color: var(--c-green); margin-bottom: 16px;"></i>
+  <h3 style="margin: 0 0 8px;">暂无错误数据</h3>
+  <p class="text-secondary">近 {{ days }} 天内没有记录到错误，继续保持！</p>
+  <a href="{% url 'words:learn_start' %}" class="btn btn-primary" style="margin-top: 16px;">
+    <i class="ph ph-target"></i> 去背单词
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function requestAiAnalysis() {
+  const btn = document.getElementById('aiAnalysisBtn');
+  const card = document.getElementById('aiAnalysisCard');
+  const content = document.getElementById('aiAnalysisContent');
+  const meta = document.getElementById('aiAnalysisMeta');
+  
+  // 禁用按钮，显示加载状态
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> 分析中...';
+  card.style.display = 'block';
+  content.innerHTML = '<div class="text-secondary"><i class="ph ph-spinner ph-spin"></i> AI 正在分析你的错误模式，请稍候...</div>';
+  meta.textContent = '';
+  
+  try {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const response = await fetch('/api/error-patterns/ai-analysis/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      content.innerHTML = formatAiResponse(data.analysis);
+      const costInfo = data.cost ? ` · 成本 $${data.cost.toFixed(4)}` : '';
+      meta.innerHTML = `<span class="text-sm text-secondary">使用模型: ${escapeHtml(data.model_used)} · 耗时 ${(data.duration_ms / 1000).toFixed(1)}s${costInfo}</span>`;
+    } else {
+      content.innerHTML = `<div style="color: var(--c-red);"><i class="ph ph-warning"></i> ${escapeHtml(data.error)}</div>`;
+      if (data.reason_code === 'ai_circuit_open') {
+        content.innerHTML += '<div class="text-secondary" style="margin-top: 8px;">AI 服务暂时不可用，请稍后再试</div>';
+      }
+    }
+  } catch (e) {
+    content.innerHTML = `<div style="color: var(--c-red);"><i class="ph ph-warning"></i> 请求失败: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ph ph-brain"></i> AI 分析我的错误';
+  }
+}
+
+function formatAiResponse(text) {
+  // 简单的 Markdown 风格格式化
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n## (.+)/g, '<h4 style="margin: 16px 0 8px; color: var(--c-primary);">$1</h4>')
+    .replace(/\n### (.+)/g, '<h5 style="margin: 12px 0 6px;">$1</h5>')
+    .replace(/\n- /g, '<br>• ')
+    .replace(/\n\d+\. /g, '<br>$&')
+    .replace(/\n\n/g, '<br><br>');
+}
+</script>
+{% endblock %}

@@ -13,6 +13,9 @@
     <span class="text-sm text-secondary" style="font-weight: 400;">按错误风险从高到低，精选最需巩固的 {{ selected_count }} 个</span>
   </h2>
   <div class="flex" style="gap: 8px; flex-wrap: wrap;">
+    <a href="{% url 'words:error_patterns' %}" class="btn btn-secondary btn-sm">
+      <i class="ph ph-chart-pie-slice"></i> 错误模式分析
+    </a>
     <a href="{% url 'words:pending_reviews' %}" class="btn btn-secondary btn-sm">
       <i class="ph ph-clock-counter-clockwise"></i> 待复核
     </a>
