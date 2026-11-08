@@ -4,7 +4,7 @@
 
 ## 使用
 
-1. 从 [GitHub Releases](https://github.com/qiuzxxxxx/Lexizx/releases/latest) 下载最新版 `word.exe`，双击运行——弹出**原生桌面窗口**，首次启动约 1–2 分钟自动建库并导入词库与真题
+1. 从 [GitHub Releases](https://github.com/qiuzxxxxx/Lexizx/releases/latest) 下载最新版 `StudyTool-Setup-版本号.exe`，运行安装程序并按向导选择安装位置；如需免安装版，也可下载 `word.exe`。首次启动约 1–2 分钟自动建库并导入词库与真题
 2. AI 功能需先在「设置」页配置模型 API key
 3. **关闭窗口即退出程序**
 4. 老版本用户可在「设置 → 关于」点「检查更新」，检测到新版本后点一次「立即更新」即全自动完成下载、校验、替换与重启，失败会自动回滚到旧版本

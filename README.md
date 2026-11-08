@@ -1,13 +1,13 @@
 # 学习工具
 面向考研英语学习的 Windows 桌面应用。下载后双击即可使用，无需注册。
 
+**[点击查看详细使用说明](docs/USER_GUIDE.md)**
+
 **[下载最新版 word.exe](https://github.com/qiuzxxxxx/Lexizx/releases/latest/download/word.exe)** · [版本与更新说明](https://github.com/qiuzxxxxx/Lexizx/releases/latest)
 
 支持词汇背诵与复习、考研真题和写作、英语一长难句翻译、六级汉译英、AI 组卷与学习助手。
 
 AI 功能需要联网并自行配置模型 API，可能产生服务费用；AI 内容仅供学习参考。学习数据保存在本机，换电脑或重装前请先备份。
-
-使用方法、AI 配置、备份恢复和功能说明：[用户使用说明](docs/USER_GUIDE.md)
 
 ## 关于本项目
 
