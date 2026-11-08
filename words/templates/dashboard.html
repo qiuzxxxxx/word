@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}仪表盘 - 考研单词背诵系统{% endblock %}
+{% block title %}仪表盘 - 学习工具{% endblock %}
 {% block page_title %}仪表盘{% endblock %}
 
 {% block content %}
@@ -15,7 +15,7 @@
       <div class="onboarding-icon">
         <i class="ph ph-hand-waving"></i>
       </div>
-      <h2 id="onboardingTitle">欢迎使用 Lexizx！</h2>
+      <h2 id="onboardingTitle">欢迎使用「学习工具」！</h2>
       <p class="onboarding-desc">这是一个帮你高效背诵考研单词的学习助手。让我们花一分钟了解一下如何使用它。</p>
       <div class="onboarding-features">
         <div class="onboarding-feature">
@@ -274,6 +274,74 @@
     <a href="{% url 'words:error_patterns' %}" class="btn btn-secondary btn-sm"><i class="ph ph-chart-pie-slice"></i> 错误分析</a>
   </div>
 </div>
+</section>
+
+<!-- 背诵官阶：由当前已掌握词数即时计算，不写入学习进度 -->
+<section class="stack" aria-label="背诵官阶">
+  <div class="card recitation-rank-card">
+    <div class="recitation-rank-heading">
+      <div>
+        <h2 class="card-header">背诵官阶</h2>
+        <p class="text-secondary recitation-rank-description">按当前已掌握词数晋级；答错已掌握词不会降级。</p>
+      </div>
+      <span class="badge badge-master">{{ recitation_rank.current.grade }}</span>
+    </div>
+
+    <div class="recitation-rank-summary">
+      <div>
+        <div class="recitation-rank-name">{{ recitation_rank.current.name }}</div>
+        {% if total_words > 0 %}
+        <div class="text-secondary text-sm">累计掌握 {{ mastered_words }} / {{ total_words }} 词</div>
+        {% else %}
+        <div class="text-secondary text-sm">词库尚未初始化</div>
+        {% endif %}
+      </div>
+      {% if total_words == 0 %}
+        <div class="text-secondary text-sm recitation-rank-next">导入词库后即可开始晋级</div>
+      {% elif recitation_rank.next %}
+        <div class="text-secondary text-sm recitation-rank-next">
+          再掌握 <strong>{{ recitation_rank.words_to_next }}</strong> 词，晋升为{{ recitation_rank.next.grade }} {{ recitation_rank.next.name }}
+        </div>
+      {% else %}
+        <div class="text-secondary text-sm recitation-rank-next">已达到最高官阶</div>
+      {% endif %}
+    </div>
+
+    {% if total_words > 0 and recitation_rank.next %}
+    <div class="progress-bar recitation-rank-progress" role="progressbar"
+         aria-label="当前官阶晋级进度" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="{{ recitation_rank.progress_percent }}"
+         aria-valuetext="已掌握 {{ mastered_words }} 词，下一等级门槛 {{ recitation_rank.next.threshold }} 词">
+      <div class="progress-bar-fill" style="width: {{ recitation_rank.progress_percent }}%;"></div>
+    </div>
+    {% endif %}
+
+    <details class="recitation-rank-details">
+      <summary>查看完整官阶表</summary>
+      <div class="table-wrap recitation-rank-table-wrap" tabindex="0" role="region" aria-label="背诵官阶完整列表，可横向滚动">
+        <table class="table recitation-rank-table">
+          <caption>按累计掌握词数划分的背诵官阶</caption>
+          <thead>
+            <tr>
+              <th scope="col">累计掌握词数</th>
+              <th scope="col">官职与品级</th>
+              <th scope="col">明代员额参考</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for level in recitation_rank.levels %}
+            <tr{% if level.is_current %} class="recitation-rank-current" aria-current="true"{% endif %}>
+              <td>{{ level.range_label }}</td>
+              <th scope="row">{{ level.grade }} {{ level.name }}</th>
+              <td>{{ level.basis }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-secondary text-sm recitation-rank-note">官职品级和设置参考明代官制；实际员额会随时期与地区变化。词数门槛是本软件的晋级规则。</p>
+    </details>
+  </div>
 </section>
 
 <!-- 学习成就 -->

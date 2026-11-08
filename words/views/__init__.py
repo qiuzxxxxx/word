@@ -33,6 +33,7 @@ from django.db import IntegrityError
 from django.views.decorators.http import require_http_methods
 
 from ..secret_vault import VaultError, decrypt as decrypt_secret, encrypt as encrypt_secret
+from ..recitation_levels import get_recitation_level
 from .update import (
     api_check_update, api_update_download, api_update_download_status,
     api_update_download_cancel, api_update_result, api_update_result_ack,
@@ -130,6 +131,7 @@ def dashboard(request):
     ).exclude(learned_date=today).count()
     total_words = Word.objects.count()
     mastered_words = StudyProgress.objects.filter(status='mastered').count()
+    recitation_rank = get_recitation_level(mastered_words)
     # also count learning+reviewing
     learning_words = StudyProgress.objects.exclude(status='new').exclude(status='mastered').count()
     # GitHub 语言条式占比（一位小数，供总体进度卡分段条/图例使用）
@@ -197,6 +199,7 @@ def dashboard(request):
         'plan_today': plan_today,
         'total_words': total_words,
         'mastered_words': mastered_words,
+        'recitation_rank': recitation_rank,
         'learning_words': learning_words,
         'master_percent': master_percent,
         'learning_percent': learning_percent,

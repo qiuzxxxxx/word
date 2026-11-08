@@ -53,7 +53,7 @@ def encrypt(plaintext):
         ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD,
         ctypes.POINTER(_DataBlob)]
     crypt32.CryptProtectData.restype = wintypes.BOOL
-    if not crypt32.CryptProtectData(ctypes.byref(source), 'Lexizx AI API key', None,
+    if not crypt32.CryptProtectData(ctypes.byref(source), '学习工具 AI API key', None,
                                      None, None, 0, ctypes.byref(protected)):
         _raise_last_error('CryptProtectData')
     try:

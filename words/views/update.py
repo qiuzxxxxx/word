@@ -17,14 +17,14 @@ from django.views.decorators.http import require_http_methods
 
 GITHUB_LATEST_RELEASE_API = (
     'https://api.github.com/repos/'
-    '1826548016-cloud/Lexizx/releases/latest'
+    'qiuzxxxxx/Lexizx/releases/latest'
 )
 # 主站 Atom 订阅源：走 github.com 而非 api.github.com，不受未授权 API
 # 配额（60 次/小时，出口 IP 共享时常被占满 → 403）限制，国内也更稳。
 GITHUB_RELEASES_ATOM = (
-    'https://github.com/1826548016-cloud/Lexizx/releases.atom'
+    'https://github.com/qiuzxxxxx/Lexizx/releases.atom'
 )
-RELEASE_PAGE = ('https://github.com/1826548016-cloud/'
+RELEASE_PAGE = ('https://github.com/qiuzxxxxx/'
                 'Lexizx/releases/latest')
 
 
