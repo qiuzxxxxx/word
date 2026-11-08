@@ -1,8 +1,7 @@
-# Lexizx｜考研英语学习工具
-# 本人旧id因为账号注销问题在此id继续维护更新
+# 学习工具
 面向考研英语学习的 Windows 桌面应用。下载后双击即可使用，无需注册。
 
-**[下载最新版 word.exe](https://github.com/1826548016-cloud/Lexizx/releases/latest/download/word.exe)** · [版本与更新说明](https://github.com/1826548016-cloud/Lexizx/releases/latest)
+**[下载最新版 word.exe](https://github.com/qiuzxxxxx/Lexizx/releases/latest/download/word.exe)** · [版本与更新说明](https://github.com/qiuzxxxxx/Lexizx/releases/latest)
 
 支持词汇背诵与复习、考研真题和写作、英语一长难句翻译、六级汉译英、AI 组卷与学习助手。
 
