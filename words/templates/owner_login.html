@@ -3,7 +3,8 @@
 {% block portal_class %}portal-auth{% endblock %}
 {% block portal %}
 <section class="portal-panel portal-auth-panel" aria-labelledby="login-title">
-  <h1 id="login-title">登录学习工具</h1>
+  <h1 id="login-title">欢迎来到驻留集</h1>
+  {% if request.GET.reset_success %}<p class="portal-notice portal-notice--success" role="status" style="margin-bottom: 0.75rem;"><i class="ph ph-check-circle" aria-hidden="true"></i> 密码已成功重置，请使用新密码登录。</p>{% endif %}
   {% if site_state.maintenance %}<p class="portal-notice"><i class="ph ph-wrench" aria-hidden="true"></i>{{ site_state.message|default:'网站正在维护，普通账号暂时无法登录。' }}</p>{% endif %}
   <form class="portal-form" method="post" action="{% url 'owner_login' %}">
     {% csrf_token %}
@@ -15,6 +16,9 @@
       {{ form.username.errors }}
     </div>
     {% include 'partials/portal_field.html' with field=form.password %}
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 0.875rem; margin-top: -0.25rem;">
+      <a href="{% url 'password_reset' %}" style="font-size: 0.875rem; color: var(--c-text-2); text-decoration: none;">忘记密码？</a>
+    </div>
     <button class="btn btn-primary portal-submit" type="submit">登录 <i class="ph ph-arrow-right" aria-hidden="true"></i></button>
   </form>
   {% if signup_available and not site_state.maintenance %}
@@ -23,4 +27,7 @@
   </div>
   {% endif %}
 </section>
+{% endblock %}
+{% block portal_footer %}
+  {% include 'partials/site_record.html' %}
 {% endblock %}

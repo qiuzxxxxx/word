@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}设置 - 学习工具{% endblock %}
+{% block title %}设置 - 驻留集{% endblock %}
 {% block page_title %}设置{% endblock %}
 
 {% block extra_head %}
@@ -361,6 +361,19 @@
           {% endif %}
         </div>
       </div>
+      {% if server_mode %}
+      <div class="about-block" style="margin-top: 14px;">
+        <div class="about-block-title"><i class="ph ph-lock-key" style="color: var(--c-blue);"></i> 账号安全</div>
+        <div class="text-secondary text-sm" style="margin-bottom: 10px;">
+          绑定邮箱：<strong>{{ request.user.email|default:'未绑定' }}</strong>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{% url 'password_reset' %}" class="btn btn-secondary btn-xs">
+            <i class="ph ph-key"></i> 修改密码
+          </a>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <!-- ============ 关于 ============ -->
@@ -396,7 +409,7 @@
             <span class="stat-icon stat-icon--green"><i class="ph ph-calendar-check"></i></span>
             <span class="about-stat-title">最后更新</span>
           </div>
-          <div class="stat-value">2026-11-08</div>
+          <div class="stat-value">2026-11-22</div>
         </div>
       </div>
 
@@ -410,10 +423,10 @@
           <a href="mailto:zixuanqiu72@gmail.com" class="about-link">
             <i class="ph ph-envelope-simple"></i> <span>zixuanqiu72@gmail.com</span>
           </a>
-          <a href="https://github.com/qiuzxxxxx/Lexizx" target="_blank" rel="noopener" class="about-link">
+          <a href="https://github.com/qiuzxxxxx/word" target="_blank" rel="noopener" class="about-link">
             <i class="ph ph-github-logo"></i> <span>GitHub 项目仓库</span>
           </a>
-          <a href="https://github.com/qiuzxxxxx/Lexizx/issues/new" target="_blank" rel="noopener" class="about-link">
+          <a href="https://github.com/qiuzxxxxx/word/issues/new" target="_blank" rel="noopener" class="about-link">
             <i class="ph ph-chat-circle-text"></i> <span>欢迎反馈 / 提建议</span>
           </a>
         </div>
@@ -516,6 +529,8 @@
     </div>
   </div>
 </div>
+
+{% if server_mode %}{% include 'partials/site_record.html' %}{% endif %}
 
 {% endblock %}
 
@@ -1307,7 +1322,8 @@ function renderModelList() {
         '<div class="flex items-center gap-2">' +
           modelHealthSpan(m) +
           '<span class="text-sm" style="color: ' + (m.enabled ? 'var(--c-green)' : 'var(--c-text-3)') + ';">' + (m.enabled ? '已启用' : '已禁用') + '</span>' +
-          (m.is_public ? '' :
+          (m.is_public ?
+            '<button class="btn btn-sm btn-secondary" id="testModelBtn' + m.id + '" onclick="testSavedModel(' + m.id + ')" title="测试该公共模型的连接"><i class="ph ph-plugs-connected"></i> 测试</button>' :
             '<label class="switch"><input type="checkbox" ' + (m.enabled ? 'checked' : '') + ' onchange="toggleAIModel(' + m.id + ')"><span class="slider"></span></label>' +
             '<button class="btn btn-sm btn-secondary" id="testModelBtn' + m.id + '" onclick="testSavedModel(' + m.id + ')" title="测试该模型的 API 连接"><i class="ph ph-plugs-connected"></i></button>' +
             '<button class="btn btn-sm btn-secondary" onclick="editAIModel(' + m.id + ')" title="编辑模型"><i class="ph ph-pencil-simple"></i></button>' +
@@ -1366,8 +1382,11 @@ async function testSavedModel(id) {
   var btn = document.getElementById('testModelBtn' + id);
   var status = document.getElementById('testModelStatus' + id);
   if (!btn || !status) return;
+  var isPub = !!m.is_public;
   btn.disabled = true;
-  btn.innerHTML = '<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite;"></i>';
+  btn.innerHTML = isPub
+    ? '<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite;"></i> 测试中'
+    : '<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite;"></i>';
   status.style.display = 'block';
   status.style.color = 'var(--c-text-3)';
   status.innerHTML = '<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite;"></i> 正在连接 ' + escapeHtml(m.model_id) + ' …';
@@ -1378,24 +1397,37 @@ async function testSavedModel(id) {
       model_id: id,
     });
     if (res && res.success) {
-      btn.innerHTML = '<i class="ph ph-check-circle" style="color: var(--c-green);"></i>';
+      btn.innerHTML = isPub
+        ? '<i class="ph ph-check-circle" style="color: var(--c-green);"></i> 成功'
+        : '<i class="ph ph-check-circle" style="color: var(--c-green);"></i>';
       status.style.color = 'var(--c-green)';
-      status.innerHTML = '<i class="ph ph-check-circle"></i> 连接成功（' + ts + '）：密钥有效，模型可正常调用';
+      status.innerHTML = '<i class="ph ph-check-circle"></i> 连接成功（' + ts + '）：' + (isPub ? '公共模型连接正常，随时可调用' : '密钥有效，模型可正常调用');
       showToast('「' + (m.display_name || m.model_id) + '」连接成功', 'success');
     } else {
-      btn.innerHTML = '<i class="ph ph-x-circle" style="color: var(--c-red);"></i>';
+      btn.innerHTML = isPub
+        ? '<i class="ph ph-x-circle" style="color: var(--c-red);"></i> 失败'
+        : '<i class="ph ph-x-circle" style="color: var(--c-red);"></i>';
       status.style.color = 'var(--c-red)';
       var hint = res && res.key_invalid ? '（密钥无效）' : (res && res.model_invalid ? '（模型或地址错误）' : '');
       status.innerHTML = '<i class="ph ph-x-circle"></i> 连接失败（' + ts + '）：' + escapeHtml((res && res.error) || '未知错误') + hint;
       showToast('连接失败：' + ((res && res.error) || '未知错误'), 'error');
     }
   } catch (e) {
-    btn.innerHTML = '<i class="ph ph-x-circle" style="color: var(--c-red);"></i>';
+    btn.innerHTML = isPub
+      ? '<i class="ph ph-x-circle" style="color: var(--c-red);"></i> 失败'
+      : '<i class="ph ph-x-circle" style="color: var(--c-red);"></i>';
     status.style.color = 'var(--c-red)';
     status.textContent = '请求失败，请检查网络';
   } finally {
     btn.disabled = false;
     refreshModelHealth(id);
+    setTimeout(function () {
+      if (btn) {
+        btn.innerHTML = isPub
+          ? '<i class="ph ph-plugs-connected"></i> 测试'
+          : '<i class="ph ph-plugs-connected"></i>';
+      }
+    }, 3500);
   }
 }
 

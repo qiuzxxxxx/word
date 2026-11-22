@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UsernameField
@@ -11,7 +13,8 @@ class AccountUsernameField(UsernameField):
 
     def clean(self, value):
         username = super().clean(value)
-        if '@' in username or username.casefold() == settings.OWNER_USERNAME.casefold():
+        normalized = unicodedata.normalize('NFKC', username).casefold()
+        if '@' in username or normalized == settings.OWNER_USERNAME.casefold():
             raise ValidationError('该用户名不可用。')
         return username
 

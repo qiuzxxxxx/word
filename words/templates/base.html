@@ -4,8 +4,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}学习工具{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=361">
+  <title>{% block title %}驻留集{% endblock %}</title>
+  <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=364">
   <!-- Phosphor 图标字体（随程序打包的本地静态资源，离线可用，不发起任何外网请求） -->
   <link rel="stylesheet" href="{% static 'vendor/phosphor/regular/style.css' %}?v=211">
   <link rel="stylesheet" href="{% static 'vendor/phosphor/fill/style.css' %}?v=211">
@@ -66,7 +70,7 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
-        <i class="ph ph-book-open text-accent"></i> 大雪深埋
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="sidebar-logo-img"> 驻留集
       </div>
       <nav class="sidebar-nav" id="sidebarNav">
         <a href="{% url 'words:dashboard' %}" data-nav="dashboard">
@@ -137,7 +141,7 @@
     <!-- Main Content -->
     <main class="main-content{% if server_mode %} main-content--web{% endif %}">
       <div class="top-bar">
-        <div class="top-bar-title">{% block page_title %}考研单词背诵系统{% endblock %}</div>
+        <div class="top-bar-title">{% block page_title %}驻留集{% endblock %}</div>
         <div class="top-bar-actions">
           <!-- 刷新当前页：所有页面共用（设置里改过的主题、壁纸等本地偏好不会丢，页面数据从服务端重新读取） -->
           <button id="refreshBtn" class="btn btn-secondary btn-sm" onclick="refreshPage(this)"
@@ -147,6 +151,15 @@
           <button id="themeToggle" class="btn btn-secondary btn-sm" onclick="toggleTheme()" title="切换主题">
             <i id="themeIcon" class="ph ph-moon"></i>
           </button>
+          {% if server_mode and site_announcements %}
+          {% if request.path == '/' or request.resolver_match.url_name == 'dashboard' %}
+          <button id="topAnnouncementBtn" class="btn btn-secondary btn-sm top-announcement-btn" onclick="openAnnouncementModal()" title="查看公告与历史记录">
+            <i class="ph ph-megaphone" style="color: var(--c-red-deep);"></i>
+            <span>公告</span>
+            <span id="announcementDot" class="announcement-unread-dot hidden" aria-label="有新公告"></span>
+          </button>
+          {% endif %}
+          {% endif %}
           {% if server_mode %}
           {% if can_manage_site %}<a class="btn btn-secondary btn-sm" href="{% url 'site_control' %}">管理端</a>{% endif %}
           <form method="post" action="{% url 'owner_logout' %}">
@@ -158,15 +171,11 @@
       </div>
 
       <div class="page-content">
-        {% for announcement in site_announcements %}
-        <section class="card site-announcement">
-          <h2><i class="ph ph-megaphone" aria-hidden="true"></i> {{ announcement.title }}</h2>
-          <div class="markdown-body announcement-content">{{ announcement.body|announcement_html }}</div>
-        </section>
-        {% endfor %}
+        {% if request.path == '/' or request.resolver_match.url_name == 'dashboard' %}
+        {% include 'partials/announcement_modal.html' %}
+        {% endif %}
         {% block content %}{% endblock %}
       </div>
-      {% if server_mode %}{% include 'partials/site_record.html' %}{% endif %}
     </main>
   </div>
 

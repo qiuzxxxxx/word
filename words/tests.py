@@ -2511,7 +2511,7 @@ class UpdaterCoreTests(SimpleTestCase):
         exe_url, sha_url = updater.asset_urls('v3.4.5')
         self.assertEqual(
             exe_url,
-            'https://github.com/qiuzxxxxx/Lexizx/releases/download/v3.4.5/word.exe')
+            'https://github.com/qiuzxxxxx/word/releases/download/v3.4.5/word.exe')
         self.assertTrue(sha_url.endswith('/word.exe.sha256'))
 
     def test_sha_parsing_and_verify(self):

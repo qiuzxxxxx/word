@@ -33,7 +33,7 @@ def privacy(request):
         from accounts.models import Announcement
 
         portal = {'can_manage_site': is_owner(request.user),
-                  'site_announcements': list(Announcement.objects.filter(published=True)[:5])}
+                  'site_announcements': list(Announcement.objects.filter(published=True)[:50])}
     return {
         'server_mode': server_mode,
         'privacy_version': current,

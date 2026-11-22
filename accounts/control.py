@@ -1,3 +1,5 @@
+from urllib.request import ProxyHandler, build_opener
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -22,9 +24,11 @@ from .usernames import AccountUsernameField, username_exists
 class AccountForm(forms.Form):
     username = AccountUsernameField()
     email = forms.EmailField(label='邮箱', max_length=150, required=False)
-    password = forms.CharField(label='新密码', required=False, max_length=128,
-                               widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
-                               help_text='新建时必填。编辑时留空保留原密码。')
+    password = forms.CharField(label='新密码', required=False, min_length=6, max_length=12,
+                               error_messages={'min_length': '密码长度必须在 6 至 12 位之间。',
+                                               'max_length': '密码长度必须在 6 至 12 位之间。'},
+                               widget=forms.PasswordInput(attrs={'autocomplete': 'new-password', 'minlength': 6, 'maxlength': 12}),
+                               help_text='新建时必填（6-12位）。编辑时留空保留原密码。')
 
     def __init__(self, *args, target=None, **kwargs):
         self.target = target
@@ -134,10 +138,29 @@ def home(request):
         accounts = accounts.filter(Q(user__username__icontains=query) | Q(email__icontains=query))
     from django.core.paginator import Paginator
 
+    default_page_size = 20
+    page_size_options = [10, 20, 50, 100]
+    try:
+        page_size = int(request.GET.get('page_size', default_page_size))
+        if page_size not in page_size_options:
+            page_size = default_page_size
+    except (ValueError, TypeError):
+        page_size = default_page_size
+
+    paginator = Paginator(accounts.order_by('-pk'), page_size)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    elided_pages = list(paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1)) if paginator.num_pages > 1 else []
+
     return render(request, 'control_home.html', {
-        'accounts': Paginator(accounts.order_by('-pk'), 30).get_page(request.GET.get('page')),
-        'query': query, 'announcements': Announcement.objects.all(),
-        'shared_models': SharedModel.objects.order_by('name', 'pk'), 'site': request.site_state,
+        'accounts': page_obj,
+        'page_size': page_size,
+        'page_size_options': page_size_options,
+        'elided_pages': elided_pages,
+        'query': query,
+        'announcements': Announcement.objects.all(),
+        'shared_models': SharedModel.objects.order_by('name', 'pk'),
+        'site': request.site_state,
     })
 
 
@@ -203,3 +226,49 @@ def action(request, section, pk):
             raise Http404
     messages.success(request, {'ban': '账号已封禁。', 'unban': '账号已解封。', 'delete': '已删除。'}[operation])
     return redirect('site_control')
+
+
+@require_http_methods(['POST'])
+def test_shared_model(request, pk):
+    if not is_owner(request.user):
+        raise PermissionDenied
+    import json
+    import urllib.request
+    from words.secret_vault import decrypt
+    from words.views import build_ai_headers, _ai_first_choice, _ai_parse_json_body, _AIRequestError
+    from .ai_gateway import PublicHTTPSHandler, NoRedirects
+
+    shared = get_object_or_404(SharedModel, pk=pk)
+    try:
+        api_key = decrypt(shared.encrypted_key)
+    except Exception as e:
+        return JsonResponse({'error': f'密钥解密失败: {e}'}, status=400)
+
+    try:
+        https_endpoint(shared.endpoint)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    payload = {
+        'model': shared.model_id,
+        'max_tokens': 1,
+        'messages': [{'role': 'user', 'content': 'ping'}],
+    }
+    req = urllib.request.Request(
+        shared.endpoint,
+        data=json.dumps(payload).encode('utf-8'),
+        headers=build_ai_headers(api_key),
+        method='POST',
+    )
+    try:
+        opener = build_opener(ProxyHandler({}), PublicHTTPSHandler(), NoRedirects())
+        with opener.open(req, timeout=15) as resp:
+            raw = resp.read(5 * 1024 * 1024 + 1)
+        _ai_first_choice(_ai_parse_json_body(raw))
+        return JsonResponse({'success': True, 'message': '连接成功，密钥有效'})
+    except urllib.error.HTTPError as e:
+        body = e.read(4096).decode('utf-8', 'ignore')
+        return JsonResponse({'error': f'连接失败 (HTTP {e.code}): {body[:200]}'}, status=502)
+    except Exception as e:
+        return JsonResponse({'error': f'连接失败: {e}'}, status=502)
+

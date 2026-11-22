@@ -38,12 +38,13 @@
     <a class="btn btn-primary" href="{% url 'control_new' 'users' %}"><i class="ph ph-user-plus" aria-hidden="true"></i> 创建用户</a>
   </header>
   <form method="get" action="{% url 'site_control' %}#users" class="control-search">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
     <div class="control-search-field">
       <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
       <input class="form-input" type="search" name="q" value="{{ query }}" maxlength="150" placeholder="用户名或邮箱" aria-label="用户名或邮箱">
     </div>
     <button class="btn btn-secondary" type="submit">搜索</button>
-    {% if query %}<a class="btn btn-secondary" href="{% url 'site_control' %}#users">清除</a>{% endif %}
+    {% if query %}<a class="btn btn-secondary" href="{% url 'site_control' %}?page_size={{ page_size }}#users">清除</a>{% endif %}
   </form>
   <ul class="control-list">
     {% for account in accounts %}
@@ -68,14 +69,75 @@
     </li>
     {% empty %}<li class="control-empty"><i class="ph ph-users" aria-hidden="true"></i>{% if query %}没有符合条件的用户。{% else %}还没有普通用户。{% endif %}</li>{% endfor %}
   </ul>
-  {% if accounts.has_other_pages %}
-  <nav class="portal-actions control-pagination" aria-label="账号分页">
-    {% if accounts.has_previous %}<a class="btn btn-secondary" href="?q={{ query|urlencode }}&amp;page={{ accounts.previous_page_number }}#users">上一页</a>{% endif %}
-    <span class="portal-muted">第 {{ accounts.number }} 页 / 共 {{ accounts.paginator.num_pages }} 页</span>
-    {% if accounts.has_next %}<a class="btn btn-secondary" href="?q={{ query|urlencode }}&amp;page={{ accounts.next_page_number }}#users">下一页</a>{% endif %}
-  </nav>
+
+  {% if accounts.paginator.count > 0 %}
+  <div class="control-pagination-bar">
+    <div class="control-pagination-info">
+      <span class="portal-muted">显示第 {{ accounts.start_index }}-{{ accounts.end_index }} 位，共 {{ accounts.paginator.count }} 位</span>
+      <div class="control-pagesize-select">
+        <label for="pageSizeSelect" class="portal-muted">每页：</label>
+        <select id="pageSizeSelect" class="form-input form-input--compact" onchange="changePageSize(this.value)">
+          {% for size in page_size_options %}
+          <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }} 条</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if accounts.has_other_pages %}
+    <nav class="portal-actions control-pagination" aria-label="账号分页">
+      {% if accounts.has_previous %}
+      <a class="btn btn-secondary btn-sm" href="?q={{ query|urlencode }}&amp;page_size={{ page_size }}&amp;page=1#users" title="第一页">首页</a>
+      <a class="btn btn-secondary btn-sm" href="?q={{ query|urlencode }}&amp;page_size={{ page_size }}&amp;page={{ accounts.previous_page_number }}#users">上一页</a>
+      {% endif %}
+
+      <div class="control-page-numbers">
+        {% for page_num in elided_pages %}
+          {% if page_num == accounts.paginator.ELLIPSIS %}
+            <span class="control-page-ellipsis">…</span>
+          {% elif page_num == accounts.number %}
+            <span class="btn btn-primary btn-sm control-page-current" aria-current="page">{{ page_num }}</span>
+          {% else %}
+            <a class="btn btn-secondary btn-sm" href="?q={{ query|urlencode }}&amp;page_size={{ page_size }}&amp;page={{ page_num }}#users">{{ page_num }}</a>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if accounts.has_next %}
+      <a class="btn btn-secondary btn-sm" href="?q={{ query|urlencode }}&amp;page_size={{ page_size }}&amp;page={{ accounts.next_page_number }}#users">下一页</a>
+      <a class="btn btn-secondary btn-sm" href="?q={{ query|urlencode }}&amp;page_size={{ page_size }}&amp;page={{ accounts.paginator.num_pages }}#users" title="最后一页">末页</a>
+      {% endif %}
+
+      <div class="control-page-jump">
+        <span class="portal-muted">跳至</span>
+        <input type="number" min="1" max="{{ accounts.paginator.num_pages }}" value="{{ accounts.number }}" data-max-pages="{{ accounts.paginator.num_pages }}" class="form-input form-input--compact page-jump-input" onkeydown="if(event.key==='Enter'){event.preventDefault();jumpToPage(this);}">
+        <span class="portal-muted">页</span>
+      </div>
+    </nav>
+    {% endif %}
+  </div>
   {% endif %}
 </section>
+
+<script>
+function changePageSize(val) {
+  var url = new URL(window.location.href);
+  url.searchParams.set('page_size', val);
+  url.searchParams.set('page', '1');
+  url.hash = 'users';
+  window.location.href = url.toString();
+}
+
+function jumpToPage(input) {
+  var page = parseInt(input.value, 10);
+  if (!page || page < 1) return;
+  var max = parseInt(input.dataset.maxPages, 10) || 1;
+  if (page > max) page = max;
+  var url = new URL(window.location.href);
+  url.searchParams.set('page', page);
+  url.hash = 'users';
+  window.location.href = url.toString();
+}
+</script>
 
 <div class="control-columns">
   <section class="portal-panel control-panel" id="public-models" aria-labelledby="models-title">
@@ -92,8 +154,12 @@
           {% else %}<span class="portal-pill">停用</span>{% endif %}</div>
           <p class="portal-muted">{{ model.model_id }}</p>
           <p class="portal-muted">每日每人 {{ model.per_user_daily }} 次 · 全站 {{ model.daily_total }} 次</p>
+          <div class="portal-model-test-status text-sm" id="testSharedStatus{{ model.pk }}" style="display: none; margin-top: 6px;"></div>
         </div>
         <div class="portal-actions">
+          <button class="btn btn-secondary" type="button" data-test-shared-model="{{ model.pk }}" data-test-url="{% url 'control_model_test' model.pk %}" title="测试公共模型 API 连通性">
+            <i class="ph ph-plugs-connected" aria-hidden="true"></i> 测试
+          </button>
           <a class="btn btn-secondary" href="{% url 'control_edit' 'model' model.pk %}">编辑</a>
           <form method="post" action="{% url 'control_action' 'model' model.pk %}">
             {% csrf_token %}<button class="btn portal-danger" name="operation" value="delete" data-confirm="确定删除这个公共模型？">删除</button>

@@ -10,7 +10,7 @@ urlpatterns = [
 if getattr(settings, 'SERVER_MODE', False):
     from accounts import control
     from accounts.auth import PortalLogin, PortalLogout
-    from accounts.registration import register
+    from accounts.registration import password_reset, register
 
     from .server_auth import health
 
@@ -21,11 +21,13 @@ if getattr(settings, 'SERVER_MODE', False):
         path('login/', PortalLogin.as_view(), name='owner_login'),
         path('logout/', PortalLogout.as_view(), name='owner_logout'),
         path('register/', register, name='register'),
+        path('password-reset/', password_reset, name='password_reset'),
         path('healthz/', health, name='health'),
         path('control/', control.home, name='site_control'),
         path('control/announcements/preview/', control.preview_announcement, name='announcement_preview'),
         path('control/<str:section>/', control.edit, name='control_new'),
         path('control/<str:section>/<int:pk>/', control.edit, name='control_edit'),
+        path('control/model/<int:pk>/test/', control.test_shared_model, name='control_model_test'),
         path('control/<str:section>/<int:pk>/action/', control.action, name='control_action'),
         path('', include('words.urls')),
     ]

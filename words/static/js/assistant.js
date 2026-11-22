@@ -3,6 +3,12 @@ window.AssistantPanel = (function () {
   var cfg = { aiSettingsUrl: '/settings/#ai-models', getCurrentWord: null };
   var sending = false;
 
+  function autoResize(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 38), 100) + 'px';
+  }
+
   function el(id) { return document.getElementById(id); }
   function panel() { return el('assistantPanel'); }
   function isOpen() { var p = panel(); return !!p && !p.classList.contains('hidden'); }
@@ -11,8 +17,14 @@ window.AssistantPanel = (function () {
     cfg = Object.assign(cfg, options || {});
     var input = el('assistantInput');
     if (input) {
+      input.addEventListener('input', function () {
+        autoResize(this);
+      });
       input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
+          if (e.isComposing || e.keyCode === 229) return;
+          var isTouchMobile = window.matchMedia('(max-width: 768px)').matches && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+          if (isTouchMobile) return;
           e.preventDefault();
           sendFromInput();
         }
@@ -228,6 +240,7 @@ window.AssistantPanel = (function () {
     var text = input.value.trim();
     if (!text) return;
     input.value = '';
+    autoResize(input);
     send(text);
   }
 

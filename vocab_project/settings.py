@@ -11,10 +11,10 @@ from pathlib import Path
 APP_VERSION = '1.0.0'
 
 # 本版更新说明（关于页「版本」卡片下方展示；发布 Release 时同步写入说明）
-APP_VERSION_NOTE = '版本号重置为 v1.0.0；新增明代官阶背诵等级；项目名称为「学习工具」'
+APP_VERSION_NOTE = '版本号重置为 v1.0.0；新增明代官阶背诵等级；项目名称更名为「驻留集」（背单词像驻留集一样常驻内存，每天坚持背诵）'
 
 # 软件使用、隐私、知识产权及二次创作声明版本（用发布日期标识）：首次使用需同意，声明修订后老用户需重新确认
-PRIVACY_VERSION = '2026-10-28'
+PRIVACY_VERSION = '2026-11-22'
 
 # ===== 运行模式检测 =====
 # PyInstaller 打包后：sys.frozen=True，sys._MEIPASS 指向解压的只读资源目录
@@ -58,11 +58,12 @@ ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '::1']
 # Cookie 完全失效。HttpOnly 与 Strict SameSite 仍可防止脚本读取会话并阻断
 # 跨站请求携带 Cookie。
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Strict'
+SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = False
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 本机会话保留 14 天，关闭 exe 后仍有效
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # 会话与登录凭证保留 90 天（3 个月），免频繁重复登录
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-CSRF_COOKIE_SAMESITE = 'Strict'
+SESSION_SAVE_EVERY_REQUEST = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 365  # CSRF 防护 Cookie 保留一年
 SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -1,0 +1,361 @@
+{% load portal_content %}
+{% if server_mode and site_announcements %}
+<div id="announcementModal" class="announcement-overlay hidden" onclick="if (event.target === this) closeAnnouncementModal()">
+  <div class="announcement-dialog" role="dialog" aria-modal="true" aria-labelledby="announcementModalTitle">
+    <!-- Meta tracking info for auto popup -->
+    {% with latest=site_announcements.0 %}
+    <span id="announcementLatestMeta" data-id="{{ latest.pk }}" data-stamp="{{ latest.updated_at|date:'U' }}" style="display:none;"></span>
+    {% endwith %}
+
+    <!-- Modal Header -->
+    <div class="announcement-head">
+      <div class="announcement-nav-pills" role="tablist">
+        <button type="button" class="announcement-nav-pill active" id="tabLatestAnnouncement" role="tab" aria-selected="true" onclick="switchAnnouncementTab('latest')">
+          <i class="ph ph-megaphone-simple"></i>
+          <span>最新公告</span>
+        </button>
+        <button type="button" class="announcement-nav-pill" id="tabHistoryAnnouncement" role="tab" aria-selected="false" onclick="switchAnnouncementTab('history')">
+          <i class="ph ph-clock-counter-clockwise"></i>
+          <span>历史公告</span>
+          <span class="ann-count-badge">{{ site_announcements|length }}</span>
+        </button>
+      </div>
+      <button type="button" class="announcement-close-btn" onclick="closeAnnouncementModal()" title="关闭" aria-label="关闭">
+        <i class="ph ph-x"></i>
+      </button>
+    </div>
+
+    <!-- Latest Announcement View -->
+    <div class="announcement-body" id="paneLatestAnnouncement">
+      {% with latest=site_announcements.0 %}
+      <div class="ann-featured-header">
+        <div class="ann-featured-title-line">
+          <h3 class="ann-featured-title" id="announcementModalTitle">{{ latest.title }}</h3>
+          <span class="ann-tag-new">最新</span>
+        </div>
+        <div class="ann-meta-time">
+          <i class="ph ph-calendar-blank"></i>
+          <span>{{ latest.updated_at|date:"Y-m-d H:i" }}</span>
+        </div>
+      </div>
+      <div class="markdown-body announcement-content ann-prose">
+        {{ latest.body|announcement_html }}
+      </div>
+      {% endwith %}
+    </div>
+
+    <!-- Latest Announcement Footer -->
+    <div class="announcement-footer" id="footerLatestAnnouncement">
+      <button type="button" class="ann-btn-history" onclick="switchAnnouncementTab('history')">
+        <i class="ph ph-clock-counter-clockwise"></i>
+        <span>查看历史公告 ({{ site_announcements|length }})</span>
+      </button>
+      <button type="button" class="ann-btn-confirm" onclick="closeAnnouncementModal()">我知道了</button>
+    </div>
+
+    <!-- History Announcements View -->
+    <div class="announcement-body hidden" id="paneHistoryAnnouncement">
+      <div class="ann-history-timeline">
+        {% for item in site_announcements %}
+        <article class="ann-history-card{% if forloop.first %} ann-history-card--first{% endif %}">
+          <header class="ann-history-top">
+            <h4 class="ann-history-card-title">
+              <span>{{ item.title }}</span>
+              {% if forloop.first %}<span class="ann-tag-new" style="font-size:0.7rem;padding:1px 5px;">最新</span>{% endif %}
+            </h4>
+            <time class="ann-meta-time"><i class="ph ph-calendar-blank"></i> {{ item.updated_at|date:"Y-m-d H:i" }}</time>
+          </header>
+          <div class="markdown-body announcement-content ann-prose" style="font-size:0.875rem;">
+            {{ item.body|announcement_html }}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- History Announcements Footer -->
+    <div class="announcement-footer hidden" id="footerHistoryAnnouncement">
+      <button type="button" class="ann-btn-history" onclick="switchAnnouncementTab('latest')">
+        <i class="ph ph-arrow-left"></i>
+        <span>返回最新公告</span>
+      </button>
+      <button type="button" class="ann-btn-confirm" onclick="closeAnnouncementModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* 弹窗核心与美化样式（内联保障零缓存阻碍） */
+.announcement-overlay {
+  position: fixed; inset: 0;
+  background: rgba(18, 14, 12, 0.45);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 16px;
+  animation: ann-fade-in .2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes ann-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.announcement-dialog {
+  background: var(--c-surface, #ffffff);
+  border-radius: 18px;
+  box-shadow: 0 20px 45px -12px rgba(44, 37, 35, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  width: min(540px, calc(100vw - 32px));
+  max-height: min(620px, 86vh);
+  display: flex; flex-direction: column;
+  overflow: hidden; position: relative;
+  animation: ann-slide-up .25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes ann-slide-up {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.announcement-head {
+  padding: 16px 18px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--c-border-light, #f0ebe4);
+  background: var(--c-surface, #ffffff); flex-shrink: 0;
+}
+
+.announcement-nav-pills {
+  display: inline-flex;
+  background: var(--c-surface-2, #f3efe9);
+  padding: 3px; border-radius: 10px; gap: 3px;
+}
+.announcement-nav-pill {
+  border: none; outline: none;
+  background: transparent;
+  padding: 6px 13px; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--c-text-2, #6b635f);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: all .16s ease; line-height: 1.2;
+}
+.announcement-nav-pill:hover { color: var(--c-text, #2c2523); }
+.announcement-nav-pill.active {
+  background: var(--c-surface, #ffffff);
+  color: var(--c-red-deep, #a82e2e);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.ann-count-badge {
+  font-size: 0.75rem; padding: 1px 6px; border-radius: 10px;
+  background: rgba(168, 46, 46, 0.1); color: var(--c-red-deep, #a82e2e);
+}
+
+.announcement-close-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; outline: none;
+  background: var(--c-surface-2, #f3efe9);
+  color: var(--c-text-2, #6b635f);
+  display: inline-grid; place-items: center;
+  font-size: 1.05rem; cursor: pointer;
+  transition: all .15s ease;
+}
+.announcement-close-btn:hover {
+  background: var(--c-border, #e5ded6);
+  color: var(--c-text, #2c2523);
+  transform: scale(1.05);
+}
+
+.announcement-body { padding: 20px 22px; overflow-y: auto; flex: 1; }
+
+.ann-featured-header {
+  margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 1px dashed var(--c-border-light, #f0ebe4);
+}
+.ann-featured-title-line {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 6px;
+}
+.ann-featured-title {
+  margin: 0; font-size: 1.25rem; font-weight: 700;
+  color: var(--c-text, #2c2523); line-height: 1.35;
+}
+.ann-tag-new {
+  flex-shrink: 0; font-size: 0.75rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 6px;
+  background: #faeeeb; color: #a82e2e;
+  border: 1px solid rgba(168, 46, 46, 0.2);
+}
+.ann-meta-time {
+  font-size: 0.8125rem; color: var(--c-text-2, #8c827a);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+
+.ann-prose { font-size: 0.9375rem; line-height: 1.68; color: var(--c-text, #2c2523); }
+.ann-prose p { margin: 0 0 10px; }
+.ann-prose ul, .ann-prose ol { margin: 8px 0 12px; padding-left: 20px; }
+.ann-prose li { margin-bottom: 6px; }
+
+.announcement-footer {
+  padding: 13px 20px;
+  border-top: 1px solid var(--c-border-light, #f0ebe4);
+  background: var(--c-surface, #ffffff);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-shrink: 0;
+}
+.ann-btn-history {
+  border: 1px solid var(--c-border, #ddd5cb);
+  background: var(--c-surface, #ffffff);
+  color: var(--c-text-2, #6b635f);
+  padding: 7px 14px; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: all .15s;
+}
+.ann-btn-history:hover {
+  background: var(--c-surface-2, #f5f1eb);
+  color: var(--c-text, #2c2523);
+  border-color: var(--c-text-2, #8c827a);
+}
+.ann-btn-confirm {
+  background: var(--c-red-deep, #a82e2e);
+  color: #ffffff; border: none; outline: none;
+  padding: 8px 22px; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.ann-btn-confirm:hover {
+  background: #8e2323; transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(168, 46, 46, 0.25);
+}
+
+.ann-history-timeline { display: flex; flex-direction: column; gap: 14px; }
+.ann-history-card {
+  border: 1px solid var(--c-border-light, #f0ebe4);
+  border-radius: 12px; padding: 15px 16px;
+  background: var(--c-surface-2, #faf7f4);
+  transition: all .18s ease;
+}
+.ann-history-card:hover {
+  border-color: var(--c-border, #ddd5cb);
+  background: var(--c-surface, #ffffff);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+.ann-history-card--first {
+  border-left: 3px solid var(--c-red-deep, #a82e2e);
+  background: var(--c-surface, #ffffff);
+}
+.ann-history-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--c-border-light, #eee8e0);
+}
+.ann-history-card-title {
+  margin: 0; font-size: 1rem; font-weight: 600;
+  color: var(--c-text, #2c2523); display: flex; align-items: center; gap: 6px;
+}
+</style>
+
+<script>
+(function() {
+  function getStorage() {
+    try {
+      return window.vocabLocalStorage || window.localStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  window.openAnnouncementModal = function(tab) {
+    var modal = document.getElementById('announcementModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    if (tab) {
+      switchAnnouncementTab(tab);
+    }
+  };
+
+  window.closeAnnouncementModal = function() {
+    var modal = document.getElementById('announcementModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    markAnnouncementSeen();
+  };
+
+  window.switchAnnouncementTab = function(tab) {
+    var tabLatest = document.getElementById('tabLatestAnnouncement');
+    var tabHistory = document.getElementById('tabHistoryAnnouncement');
+    var paneLatest = document.getElementById('paneLatestAnnouncement');
+    var paneHistory = document.getElementById('paneHistoryAnnouncement');
+    var footerLatest = document.getElementById('footerLatestAnnouncement');
+    var footerHistory = document.getElementById('footerHistoryAnnouncement');
+    if (!tabLatest || !tabHistory || !paneLatest || !paneHistory) return;
+
+    if (tab === 'history') {
+      tabLatest.classList.remove('active');
+      tabLatest.setAttribute('aria-selected', 'false');
+      tabHistory.classList.add('active');
+      tabHistory.setAttribute('aria-selected', 'true');
+      paneLatest.classList.add('hidden');
+      paneHistory.classList.remove('hidden');
+      if (footerLatest) footerLatest.classList.add('hidden');
+      if (footerHistory) footerHistory.classList.remove('hidden');
+    } else {
+      tabHistory.classList.remove('active');
+      tabHistory.setAttribute('aria-selected', 'false');
+      tabLatest.classList.add('active');
+      tabLatest.setAttribute('aria-selected', 'true');
+      paneHistory.classList.add('hidden');
+      paneLatest.classList.remove('hidden');
+      if (footerHistory) footerHistory.classList.add('hidden');
+      if (footerLatest) footerLatest.classList.remove('hidden');
+    }
+  };
+
+  function markAnnouncementSeen() {
+    var meta = document.getElementById('announcementLatestMeta');
+    var storage = getStorage();
+    if (!meta || !storage) return;
+    var currentToken = (meta.dataset.id || '') + '_' + (meta.dataset.stamp || '');
+    try {
+      storage.setItem('vocab_last_seen_announcement', currentToken);
+    } catch (e) {}
+    var dot = document.getElementById('announcementDot');
+    if (dot) dot.classList.add('hidden');
+  }
+
+  function checkNewAnnouncement() {
+    var meta = document.getElementById('announcementLatestMeta');
+    var storage = getStorage();
+    if (!meta || !storage) return;
+    var currentToken = (meta.dataset.id || '') + '_' + (meta.dataset.stamp || '');
+    var seenToken = '';
+    try {
+      seenToken = storage.getItem('vocab_last_seen_announcement') || '';
+    } catch (e) {}
+
+    var dot = document.getElementById('announcementDot');
+    if (seenToken !== currentToken) {
+      if (dot) dot.classList.remove('hidden');
+      var isDashboard = window.location.pathname === '/' || window.location.pathname === '';
+      if (isDashboard) {
+        setTimeout(function() {
+          openAnnouncementModal('latest');
+        }, 350);
+      }
+    } else {
+      if (dot) dot.classList.add('hidden');
+    }
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var modal = document.getElementById('announcementModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeAnnouncementModal();
+      }
+    }
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkNewAnnouncement);
+  } else {
+    checkNewAnnouncement();
+  }
+})();
+</script>
+{% endif %}

@@ -43,7 +43,8 @@ def valid_login(request, account):
         )
     except jwt.InvalidTokenError:
         return False
-    return claims['sub'] == str(account.pk) and constant_time_compare(claims['jti'], account.login_id)
+    sub_matches = claims.get('sub') in (str(account.pk), str(account.user_id))
+    return sub_matches and constant_time_compare(claims.get('jti', ''), account.login_id)
 
 
 class EmailBackend(ModelBackend):
@@ -79,15 +80,20 @@ class PortalLogin(LoginView):
             form.add_error(None, '该账号无法登录。')
             return self.form_invalid(form)
         now = timezone.now()
-        valid_for = settings.SESSION_COOKIE_AGE
+        valid_for = getattr(settings, 'SESSION_COOKIE_AGE', 60 * 60 * 24 * 90)
         token = jwt.encode(
-            {'sub': str(user.pk), 'jti': login_id, 'iat': now, 'exp': now + timedelta(seconds=valid_for),
+            {'sub': str(account.pk), 'user_id': str(user.pk), 'jti': login_id, 'iat': now,
+             'exp': now + timedelta(seconds=valid_for),
              'iss': AUDIENCE, 'aud': AUDIENCE},
             jwt_key(), algorithm='HS256',
         )
+        if hasattr(self.request, 'session'):
+            self.request.session.set_expiry(valid_for)
         response = super().form_valid(form)
-        response.set_cookie(COOKIE, token, max_age=valid_for, secure=settings.SESSION_COOKIE_SECURE,
-                            httponly=True, samesite='Strict')
+        is_secure = settings.SESSION_COOKIE_SECURE and (self.request.is_secure() or not getattr(settings, 'DEBUG', False))
+        samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
+        response.set_cookie(COOKIE, token, max_age=valid_for, secure=is_secure,
+                            httponly=True, samesite=samesite)
         return response
 
 
@@ -96,7 +102,8 @@ class PortalLogout(LogoutView):
         if request.login_account:
             Account.objects.filter(pk=request.login_account.pk, login_id=request.login_account.login_id).update(login_id='')
         response = super().post(request, *args, **kwargs)
-        response.delete_cookie(COOKIE, samesite='Strict')
+        samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
+        response.delete_cookie(COOKIE, samesite=samesite)
         return response
 
 
@@ -133,6 +140,7 @@ class ServerAccessMiddleware:
             response = self.get_response(request)
 
         if had_cookie and not request.login_account and COOKIE not in response.cookies:
-            response.delete_cookie(COOKIE, samesite='Strict')
+            samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
+            response.delete_cookie(COOKIE, samesite=samesite)
         add_never_cache_headers(response)
         return response

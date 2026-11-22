@@ -79,7 +79,7 @@ from django.conf import settings
 DATA_DIR = Path(settings.DATA_DIR)
 DB_PATH = DATA_DIR / 'db.sqlite3'
 
-APP_TITLE = '学习工具'
+APP_TITLE = '驻留集'
 PREFERRED_PORT = 18765  # 固定端口：保证 localStorage / IndexedDB（壁纸等）跨启动保留
 
 
@@ -281,7 +281,7 @@ LOADING_HTML = """<!DOCTYPE html>
 </style></head>
 <body><div class="box">
   <div class="spinner"></div>
-  <h2>学习工具</h2>
+  <h2>驻留集</h2>
   <div id="msg">正在启动…</div>
 </div>
 <script>
@@ -528,7 +528,7 @@ def main_console():
     threading.Thread(target=open_browser, daemon=True).start()
 
     print('=' * 56)
-    print('  学习工具已启动')
+    print('  驻留集已启动')
     print('  浏览器访问：http://127.0.0.1:8000/')
     print('  数据目录：' + str(DATA_DIR))
     print('  按 Ctrl+C 退出')

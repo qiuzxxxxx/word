@@ -19,7 +19,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             user = get_user_model().objects.filter(username=settings.OWNER_USERNAME).first()
             if not user:
-                raise CommandError('请先创建最高管理员账号 zx。')
+                raise CommandError(f'请先创建最高管理员账号 {settings.OWNER_USERNAME}。')
             user.is_staff = user.is_superuser = user.is_active = True
             user.save(update_fields=['is_staff', 'is_superuser', 'is_active'])
             Account.objects.get_or_create(user=user)

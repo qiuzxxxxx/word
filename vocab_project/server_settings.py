@@ -24,7 +24,7 @@ from .settings import *  # noqa: E402,F403
 SERVER_MODE = True
 DEBUG = False
 ALLOWED_HOSTS = [required_env('WORD_HOST')]
-OWNER_USERNAME = 'zx'
+OWNER_USERNAME = os.environ.get('WORD_OWNER_USERNAME', 'qzx')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 WORD_EMAIL_FROM = os.environ.get('WORD_EMAIL_FROM', '').strip()
 
@@ -55,11 +55,8 @@ DATABASE_ROUTERS = ['accounts.workspaces.LearningRouter']
 INSTALLED_APPS = [*INSTALLED_APPS, 'accounts']
 AUTHENTICATION_BACKENDS = ['accounts.auth.EmailBackend']
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-     'OPTIONS': {'min_length': 12}},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME': 'accounts.validators.PasswordLengthValidator',
+     'OPTIONS': {'min_length': 6, 'max_length': 12}},
 ]
 _auth_index = MIDDLEWARE.index('django.contrib.auth.middleware.AuthenticationMiddleware')
 MIDDLEWARE = [*MIDDLEWARE[:_auth_index + 1],
@@ -75,8 +72,13 @@ SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 86400
 # HSTS applies to this hostname. Its child domains are outside this deployment.
 SILENCED_SYSTEM_CHECKS = ['security.W005', 'security.W021']
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # 90 天有效
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 CSRF_FAILURE_VIEW = 'vocab_project.server_auth.csrf_failure'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024
-PRIVACY_VERSION = f'{PRIVACY_VERSION}-multi'
+PRIVACY_VERSION = '2026-11-22'

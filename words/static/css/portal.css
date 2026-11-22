@@ -36,6 +36,13 @@
   white-space: nowrap;
 }
 
+.portal-brand-logo {
+  width: 1.625rem;
+  height: 1.625rem;
+  object-fit: contain;
+  display: block;
+}
+
 .portal-brand-mark, .portal-section-icon {
   display: inline-grid;
   place-items: center;
@@ -265,6 +272,89 @@
 
 @media (min-width: 58rem) {
   .control-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* 控台用户管理分页与每页控制 */
+.control-pagination-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--c-border);
+}
+@media (min-width: 48rem) {
+  .control-pagination-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+.control-pagination-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  font-size: 0.875rem;
+}
+.control-pagesize-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.form-input--compact {
+  height: 2.125rem;
+  min-height: 2.125rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+.portal-page .control-pagination .btn {
+  min-height: 32px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+.control-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.control-page-numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.control-page-ellipsis {
+  padding: 0 0.25rem;
+  color: var(--c-text-2);
+  user-select: none;
+}
+.control-page-current {
+  cursor: default;
+  font-weight: 600;
+  pointer-events: none;
+}
+.control-page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.25rem;
+  font-size: 0.8125rem;
+}
+.page-jump-input {
+  width: 3.5rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.page-jump-input::-webkit-outer-spin-button,
+.page-jump-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -11,11 +11,11 @@
 ;   - license.txt 与 words/templates/partials/privacy_modal.html 正文保持同步
 ;     （docs/legal/user-agreement-*.md 归档即对应纯文本）
 
-#define MyAppName "学习工具"
-#define MyAppFullName "学习工具（考研英语学习平台）"
+#define MyAppName "驻留集"
+#define MyAppFullName "驻留集（考研英语学习平台）"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "个人开发者"
-#define MyAppURL "https://github.com/qiuzxxxxx/Lexizx"
+#define MyAppURL "https://github.com/qiuzxxxxx/word"
 
 [Setup]
 AppId={{7F3A2C5E-9B1D-4E6F-A8C2-5D3E7F9A1B4C}

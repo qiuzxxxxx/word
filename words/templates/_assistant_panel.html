@@ -1,18 +1,51 @@
 <style>
-  /* 小助手浮动按钮（背诵/复习通用，右下角） */
-      
-  /* 小助手聊天面板 */
-    
-    
-        
-  /* AI 回答 Markdown 排版 */
-                
-  
-      
+  /* 小助手浮动按钮与面板移动端专属适配 */
   @media (max-width: 768px) {
-    .assistant-fab { bottom: 84px; right: 16px; width: 50px; height: 50px; padding: 0; justify-content: center; border-radius: 50%; }
-    .assistant-fab span { display: none; }
-    .assistant-panel { bottom: 148px; right: 16px; left: 16px; width: auto; }
+    .assistant-fab {
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+      right: 14px !important;
+      width: 48px !important;
+      height: 48px !important;
+      padding: 0 !important;
+      justify-content: center !important;
+      border-radius: 50% !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22) !important;
+      z-index: 90 !important;
+    }
+    .assistant-fab span { display: none !important; }
+    .assistant-panel {
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+      right: 10px !important;
+      left: 10px !important;
+      width: auto !important;
+      max-width: none !important;
+      height: auto !important;
+      max-height: 72vh !important;
+      border-radius: 16px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28) !important;
+      z-index: 95 !important;
+    }
+    .assistant-input-row {
+      padding: 8px 10px !important;
+      gap: 6px !important;
+    }
+    .assistant-input-row textarea {
+      font-size: 16px !important;
+      padding: 8px 12px !important;
+      border-radius: 16px !important;
+      min-height: 38px !important;
+      max-height: 100px !important;
+      resize: none !important;
+    }
+    .assistant-input-row button {
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 50% !important;
+      padding: 0 !important;
+      display: grid !important;
+      place-items: center !important;
+      flex: none !important;
+    }
   }
 </style>
 

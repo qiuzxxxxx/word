@@ -7,12 +7,48 @@ window.AIChat = (function () {
 
   function el(id) { return document.getElementById(id); }
 
+  function autoResizeInput(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    var maxH = window.matchMedia('(max-width: 768px)').matches ? 120 : 150;
+    var newH = Math.min(Math.max(textarea.scrollHeight, 38), maxH);
+    textarea.style.height = newH + 'px';
+  }
+
+  function toggleDrawer(force) {
+    var sidebar = el('aiChatSidebar');
+    var mask = el('aiChatDrawerMask');
+    if (!sidebar) return;
+    var isOpen = typeof force === 'boolean' ? force : !sidebar.classList.contains('open');
+    if (isOpen) {
+      sidebar.classList.add('open');
+      if (mask) mask.classList.add('open');
+    } else {
+      sidebar.classList.remove('open');
+      if (mask) mask.classList.remove('open');
+    }
+  }
+
   function init() {
     loadData();
     var input = el('aiChatInput');
     if (input) {
+      if (!window.matchMedia('(max-width: 768px)').matches) {
+        input.placeholder = '输入消息…（Enter 发送，Shift+Enter 换行）';
+      }
+      input.addEventListener('input', function () {
+        autoResizeInput(this);
+      });
+      input.addEventListener('focus', function () {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          setTimeout(scrollBottom, 250);
+        }
+      });
       input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
+          if (e.isComposing || e.keyCode === 229) return;
+          var isTouchMobile = window.matchMedia('(max-width: 768px)').matches && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+          if (isTouchMobile) return;
           e.preventDefault();
           sendFromInput();
         }
@@ -48,8 +84,38 @@ window.AIChat = (function () {
     });
   }
 
+  function fillPrompt(text) {
+    var input = el('aiChatInput');
+    if (!input) return;
+    input.value = text;
+    autoResizeInput(input);
+    input.focus();
+  }
+
   function showEmpty() {
-    setBody('<div class="ai-chat-empty"><span class="big"><i class="ph ph-sparkle"></i></span>我是你的 AI 智能助手<br>可以帮你分析文件、讲解单词、解答疑问、生成内容…<br><span style="font-size: var(--fs-xs); opacity: .8;">在下方输入内容，或点击纸夹图标上传文件</span></div>');
+    setBody('<div class="ai-chat-welcome">' +
+      '<div class="ai-welcome-badge"><i class="ph ph-sparkle"></i></div>' +
+      '<h2 class="ai-welcome-title">驻留集 AI 智能助手</h2>' +
+      '<p class="ai-welcome-desc">精通考研英语真题考点、长难句结构拆解与词汇辨析。你可以直接提问，或点击下方建议快捷开始：</p>' +
+      '<div class="ai-quick-prompts">' +
+        '<button type="button" class="ai-quick-prompt" onclick="AIChat.fillPrompt(\'请帮我详细分析这句话的语法结构、主干与翻译：The American economic system is organized around a basically private-enterprise, market-oriented economy.\')">' +
+          '<i class="ph ph-tree-structure"></i>' +
+          '<span>长难句结构拆解与翻译</span>' +
+        '</button>' +
+        '<button type="button" class="ai-quick-prompt" onclick="AIChat.fillPrompt(\'请深度辨析考研高频词：comprise / consist / compose / constitute 的核心差异与常见真题考法\')">' +
+          '<i class="ph ph-book-open-text"></i>' +
+          '<span>真题高频近义词辨析</span>' +
+        '</button>' +
+        '<button type="button" class="ai-quick-prompt" onclick="AIChat.fillPrompt(\'请帮我批改这句英语作文并提供考研高分地道替换：I think the rapid development of science and technology has changed our life greatly.\')">' +
+          '<i class="ph ph-pencil-line"></i>' +
+          '<span>写作表达润色与升格</span>' +
+        '</button>' +
+        '<button type="button" class="ai-quick-prompt" onclick="AIChat.fillPrompt(\'请结合考研英语常考点，出 3 道核心高频词选择测验题，包含语境题干并附带详细解析\')">' +
+          '<i class="ph ph-lightning"></i>' +
+          '<span>核心考点随堂测验</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>');
   }
 
   // ===== 会话列表 =====
@@ -59,6 +125,11 @@ window.AIChat = (function () {
     if (!conversations.length) {
       list.innerHTML = '<div class="text-secondary text-sm" style="padding: 8px 10px;">暂无会话，点击上方新建</div>';
       return;
+    }
+    var badge = el('convCountBadge');
+    if (badge) {
+      badge.textContent = conversations.length ? String(conversations.length) : '';
+      badge.style.display = conversations.length ? 'inline-block' : 'none';
     }
     list.innerHTML = conversations.map(function (c) {
       var active = currentConvId === c.id ? ' active' : '';
@@ -87,6 +158,7 @@ window.AIChat = (function () {
       if (res.success) {
         currentConvId = res.conversation.id;
         updateConvInList(res.conversation);
+        toggleDrawer(false);
         showEmpty();
         var input = el('aiChatInput');
         if (input) input.focus();
@@ -98,6 +170,7 @@ window.AIChat = (function () {
   }
 
   function switchConversation(id) {
+    toggleDrawer(false);
     if (id === currentConvId) return;
     loadData(id);
   }
@@ -150,7 +223,7 @@ window.AIChat = (function () {
     var attachHtml = '';
     if (attachments && attachments.length) {
       attachHtml = '<div class="ai-attach-tags">' + attachments.map(function (a) {
-        var icon = a.type === 'image' ? 'ph-ph-image' : 'ph-ph-file-text';
+        var icon = a.type === 'image' ? 'ph-image' : 'ph-file-text';
         return '<span class="ai-attach-tag"><i class="ph ' + icon + '"></i>' + escapeHtml(a.name || '') + '</span>';
       }).join('') + '</div>';
     }
@@ -237,7 +310,7 @@ window.AIChat = (function () {
       return;
     }
     box.innerHTML = pendingFiles.map(function (f, i) {
-      var icon = f.type === 'image' ? 'ph-ph-image' : 'ph-ph-file-text';
+      var icon = f.type === 'image' ? 'ph-image' : 'ph-file-text';
       return '<span class="ai-attach-chip"><i class="ph ' + icon + '" style="color: var(--c-green);"></i>' +
         '<span class="name">' + escapeHtml(f.name) + '</span>' +
         '<button class="rm" onclick="AIChat.removePending(' + i + ')" title="移除">&times;</button></span>';
@@ -255,6 +328,7 @@ window.AIChat = (function () {
     var text = input ? input.value.trim() : '';
     if (!text && !pendingFiles.length) return;
     input.value = '';
+    autoResizeInput(input);
     send(text);
   }
 
@@ -283,6 +357,7 @@ window.AIChat = (function () {
       if (res.success) {
         currentConvId = res.conversation.id;
         updateConvInList(res.conversation);
+        toggleDrawer(false);
         appendMsg('assistant', res.assistant_message.content, res.assistant_message.created_at);
       } else {
         appendMsg('assistant', '⚠️ ' + (res.error || '出错了'));
@@ -450,5 +525,7 @@ window.AIChat = (function () {
     newConversation: newConversation,
     switchConversation: switchConversation,
     deleteConversation: deleteConversation,
+    toggleDrawer: toggleDrawer,
+    fillPrompt: fillPrompt,
   };
 })();

@@ -4,9 +4,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block title %}{% endblock %} · 学习工具</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=361">
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=2">
+  <title>{% block title %}{% endblock %} · 驻留集</title>
+  <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=363">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=4">
   <link rel="stylesheet" href="{% static 'vendor/phosphor/regular/style.css' %}?v=211">
   {% include 'partials/browser_storage.html' %}
   <script>
@@ -24,8 +28,8 @@
   <header class="portal-top">
     <div class="portal-width portal-top-inner">
       <a class="portal-brand" href="{% url 'words:dashboard' %}">
-        <span class="portal-brand-mark"><i class="ph ph-book-open-text" aria-hidden="true"></i></span>
-        <span>学习工具</span>
+        <span class="portal-brand-mark"><img src="{% static 'img/logo.png' %}" alt="Logo" class="portal-brand-logo"></span>
+        <span>驻留集</span>
       </a>
       {% block portal_nav %}{% endblock %}
     </div>
@@ -34,6 +38,6 @@
     {% for message in messages %}<p class="portal-notice portal-notice--success" role="status">{{ message }}</p>{% endfor %}
     {% block portal %}{% endblock %}
   </main>
-  {% include 'partials/site_record.html' %}
+  {% block portal_footer %}{% endblock %}
 </body>
 </html>

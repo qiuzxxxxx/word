@@ -79,3 +79,55 @@ if (editor) {
     previewDelay = setTimeout(refreshPreview, 200);
   });
 }
+
+document.addEventListener('click', async function (event) {
+  const btn = event.target.closest('[data-test-shared-model]');
+  if (!btn) return;
+  const pk = btn.dataset.testSharedModel;
+  const url = btn.dataset.testUrl;
+  const statusEl = document.getElementById('testSharedStatus' + pk);
+  const token = document.querySelector('[name="csrfmiddlewaretoken"]')?.value;
+  btn.disabled = true;
+  const origHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite;"></i> 测试中…';
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--c-text-3)';
+    statusEl.textContent = '正在测试连接…';
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': token || '',
+        'Accept': 'application/json',
+      },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      btn.innerHTML = '<i class="ph ph-check-circle" style="color: var(--c-green);"></i> 成功';
+      if (statusEl) {
+        statusEl.style.color = 'var(--c-green)';
+        statusEl.textContent = data.message || '连接成功，密钥有效';
+      }
+    } else {
+      btn.innerHTML = '<i class="ph ph-x-circle" style="color: var(--c-red);"></i> 失败';
+      if (statusEl) {
+        statusEl.style.color = 'var(--c-red)';
+        statusEl.textContent = data.error || '连接失败';
+      }
+    }
+  } catch (err) {
+    btn.innerHTML = '<i class="ph ph-x-circle" style="color: var(--c-red);"></i> 失败';
+    if (statusEl) {
+      statusEl.style.color = 'var(--c-red)';
+      statusEl.textContent = '网络错误，请稍后重试';
+    }
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }, 3000);
+  }
+});
+

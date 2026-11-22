@@ -26,7 +26,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-GITHUB_REPO = 'qiuzxxxxx/Lexizx'
+GITHUB_REPO = 'qiuzxxxxx/word'
 ASSET_NAME = 'word.exe'
 SHA_ASSET_NAME = 'word.exe.sha256'
 USER_AGENT = 'Postgraduate-Vocabulary-Updater'

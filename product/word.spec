@@ -18,11 +18,13 @@ if PROJECT_ROOT not in sys.path:
 
 import words            # noqa: E402  触发包注册
 import vocab_project    # noqa: E402
+import accounts         # noqa: E402
 
 # ===== 数据文件（非 .py 资源）=====
 datas = []
 datas += collect_data_files('words')           # words/templates/、words/static/
 datas += collect_data_files('vocab_project')   # vocab_project/templates/ 等
+datas += collect_data_files('accounts')        # accounts/ 资源
 datas += collect_data_files('webview')         # webview 需要自己的 web 资源
 # 词汇本词库 JSON（首启自动导入）——只打包词库，不打 db.sqlite3 等用户数据
 datas += [(str(Path(PROJECT_ROOT) / 'data' / 'hongbaoshu.json'), 'data')]
@@ -31,11 +33,13 @@ datas += [(str(Path(PROJECT_ROOT) / 'data' / 'hongbaoshu.json'), 'data')]
 hiddenimports = []
 hiddenimports += collect_submodules('words')
 hiddenimports += collect_submodules('vocab_project')
+hiddenimports += collect_submodules('accounts')
 hiddenimports += collect_submodules('django.contrib')
 hiddenimports += collect_submodules('webview')           # webview 的动态子模块
 hiddenimports += ['vocab_project.settings', 'vocab_project.urls', 'vocab_project.wsgi']
 # 自动更新核心模块（项目根下的 updater.py，launch.py 动态 import，必须显式声明）
 hiddenimports += ['updater']
+hiddenimports += ['accounts.validators']
 # words 包关键模块兜底（Django 通过字符串动态 import，必须显式声明）
 hiddenimports += [
     'words', 'words.apps', 'words.urls', 'words.views', 'words.models',

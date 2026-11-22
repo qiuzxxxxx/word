@@ -4,7 +4,7 @@
 
 ## 一、升级现有站点
 
-下载最新的 `lexizx-baota-multiuser.tar.gz` 和 `lexizx-baota-multiuser.tar.gz.sha256`。在宝塔「文件」中把两个文件都上传到 `/www/wwwroot/word/`。文件名要与下方命令一致。
+下载最新的 `lexizx-baota-20261122.tar.gz` 和 `lexizx-baota-20261122.tar.gz.sha256`。在宝塔「文件」中把两个文件都上传到 `/www/wwwroot/word/`。文件名要与下方命令一致。
 
 在宝塔终端以 root 整段执行。命令会先校验并解包，再停止服务、备份数据、切换代码和安装新版。**停服务到启动完成期间，网站会短暂不可用。** 终端会打印数据备份目录和旧版代码目录，请保留这两条路径。
 
@@ -12,7 +12,7 @@
 (
 set -e
 cd /www/wwwroot/word
-sha256sum -c lexizx-baota-multiuser.tar.gz.sha256
+sha256sum -c lexizx-baota-20261122.tar.gz.sha256
 
 test -f /opt/lexizx/deploy/baota/install.sh
 test -f /var/lib/lexizx/db.sqlite3
@@ -20,9 +20,9 @@ test -f /etc/lexizx.env
 /www/server/nginx/sbin/nginx -t
 
 staging=$(mktemp -d /opt/lexizx-upload.XXXXXX)
-tar --no-same-owner -xzf lexizx-baota-multiuser.tar.gz -C "$staging"
+tar --no-same-owner -xzf lexizx-baota-20261122.tar.gz -C "$staging"
 test -f "$staging/lexizx/deploy/baota/install.sh"
-mv -- lexizx-baota-multiuser.tar.gz lexizx-baota-multiuser.tar.gz.sha256 "$staging/"
+mv -- lexizx-baota-20261122.tar.gz lexizx-baota-20261122.tar.gz.sha256 "$staging/"
 
 snapshot=$(mktemp -d /opt/lexizx-backup.XXXXXX)
 systemctl stop lexizx
@@ -36,6 +36,9 @@ if ! mv "$staging/lexizx" /opt/lexizx; then
   mv "$staging/previous" /opt/lexizx
   systemctl start lexizx
   exit 1
+fi
+if ! (source /etc/lexizx.env; [[ ${WORD_OWNER_USERNAME:-} == zx ]]); then
+  printf '\nWORD_OWNER_USERNAME=zx\n' >> /etc/lexizx.env
 fi
 cd /opt/lexizx
 bash deploy/baota/install.sh
@@ -162,8 +165,8 @@ OpenCloudOS 9 可用 `dnf install -y python3-pip curl` 安装依赖。Ubuntu 或
 (
 set -e
 cd /opt
-sha256sum -c lexizx-baota-multiuser.tar.gz.sha256
-tar --no-same-owner -xzf lexizx-baota-multiuser.tar.gz
+sha256sum -c lexizx-baota-20261122.tar.gz.sha256
+tar --no-same-owner -xzf lexizx-baota-20261122.tar.gz
 cd /opt/lexizx
 bash deploy/baota/install.sh learn.example.com zx
 )
