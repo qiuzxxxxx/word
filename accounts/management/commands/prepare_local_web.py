@@ -27,9 +27,8 @@ class Command(BaseCommand):
             if not owner:
                 owner = users.create_superuser(settings.OWNER_USERNAME, '', '123456')
             else:
-                owner.set_password('123456')
                 owner.is_staff = owner.is_superuser = owner.is_active = True
-                owner.save()
+                owner.save(update_fields=['is_staff', 'is_superuser', 'is_active'])
             Account.objects.get_or_create(user=owner)
 
             tester = users.filter(username='cs').first()
@@ -37,9 +36,8 @@ class Command(BaseCommand):
                 tester = users.create_user('cs', email='cs@example.test', password='123456')
                 Account.objects.create(user=tester)
             else:
-                tester.set_password('123456')
                 tester.is_active = True
-                tester.save()
+                tester.save(update_fields=['is_active'])
                 Account.objects.get_or_create(user=tester)
         call_command('prepare_learning', stdout=io.StringIO())
         self.stdout.write(f'本地邮件目录：{settings.EMAIL_FILE_PATH}')

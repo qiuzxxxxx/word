@@ -1,0 +1,48 @@
+{% extends 'portal_shell.html' %}
+{% block title %}用户留言{% endblock %}
+{% block portal_nav %}
+<a class="btn btn-secondary" href="{% url 'site_control' %}"><i class="ph ph-arrow-left" aria-hidden="true"></i> 返回站点管理</a>
+{% endblock %}
+{% block portal %}
+<header class="control-heading">
+  <h1>用户留言</h1>
+  <nav class="portal-actions" aria-label="留言状态">
+    <a class="btn {% if show_resolved %}btn-secondary{% else %}btn-primary{% endif %}" href="{% url 'control_feedback' %}"{% if not show_resolved %} aria-current="page"{% endif %}>待处理</a>
+    <a class="btn {% if show_resolved %}btn-primary{% else %}btn-secondary{% endif %}" href="{% url 'control_feedback' %}?status=resolved"{% if show_resolved %} aria-current="page"{% endif %}>已处理</a>
+  </nav>
+</header>
+<section class="portal-panel" aria-label="留言列表">
+  <ul class="control-list control-feedback-list">
+    {% for entry in feedback %}
+    <li class="control-row control-row--stacked">
+      <div class="control-row-body">
+        <div class="control-title-line">
+          <strong>{{ entry.account.user.username }}</strong>
+          <span class="portal-pill">{{ entry.get_category_display }}</span>
+          <time class="portal-muted" datetime="{{ entry.created_at|date:'c' }}">{{ entry.created_at|date:'Y-m-d H:i' }}</time>
+        </div>
+        <p class="portal-muted control-feedback-contact">联系方式 <span>{{ entry.contact }}</span></p>
+        <p class="control-feedback-body">{{ entry.body|linebreaksbr }}</p>
+      </div>
+      <form method="post" action="{% url 'control_feedback_status' entry.pk %}">
+        {% csrf_token %}
+        {% if show_resolved %}
+        <button class="btn btn-secondary" name="operation" value="reopen">移回待处理</button>
+        {% else %}
+        <button class="btn btn-secondary" name="operation" value="resolve">标为已处理</button>
+        {% endif %}
+      </form>
+    </li>
+    {% empty %}
+    <li class="control-empty">{% if show_resolved %}暂无已处理留言。{% else %}暂无待处理留言。{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if feedback.has_other_pages %}
+  <nav class="portal-actions control-pagination" aria-label="留言分页">
+    {% if feedback.has_previous %}<a class="btn btn-secondary" href="?page={{ feedback.previous_page_number }}{% if show_resolved %}&amp;status=resolved{% endif %}">上一页</a>{% endif %}
+    <span class="portal-muted">第 {{ feedback.number }} / {{ feedback.paginator.num_pages }} 页</span>
+    {% if feedback.has_next %}<a class="btn btn-secondary" href="?page={{ feedback.next_page_number }}{% if show_resolved %}&amp;status=resolved{% endif %}">下一页</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

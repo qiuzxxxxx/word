@@ -267,6 +267,7 @@
     if (tab) {
       switchAnnouncementTab(tab);
     }
+    modal.querySelector('.announcement-close-btn').focus();
   };
 
   window.closeAnnouncementModal = function() {
@@ -318,7 +319,7 @@
     if (dot) dot.classList.add('hidden');
   }
 
-  function checkNewAnnouncement() {
+  function updateAnnouncementUnread() {
     var meta = document.getElementById('announcementLatestMeta');
     var storage = getStorage();
     if (!meta || !storage) return;
@@ -329,17 +330,7 @@
     } catch (e) {}
 
     var dot = document.getElementById('announcementDot');
-    if (seenToken !== currentToken) {
-      if (dot) dot.classList.remove('hidden');
-      var isDashboard = window.location.pathname === '/' || window.location.pathname === '';
-      if (isDashboard) {
-        setTimeout(function() {
-          openAnnouncementModal('latest');
-        }, 350);
-      }
-    } else {
-      if (dot) dot.classList.add('hidden');
-    }
+    if (dot) dot.classList.toggle('hidden', seenToken === currentToken);
   }
 
   document.addEventListener('keydown', function(e) {
@@ -352,9 +343,9 @@
   });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkNewAnnouncement);
+    document.addEventListener('DOMContentLoaded', updateAnnouncementUnread);
   } else {
-    checkNewAnnouncement();
+    updateAnnouncementUnread();
   }
 })();
 </script>

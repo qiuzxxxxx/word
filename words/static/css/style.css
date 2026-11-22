@@ -569,6 +569,7 @@ h1, h2, h3, h4,
   padding: 0 12px;
 }
 .top-bar-actions { display: flex; align-items: center; gap: 8px; }
+.top-bar-actions .top-bar-account { display: none; }
 
 /* Page Content */
 .page-content {
@@ -1206,6 +1207,7 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .main-content { margin-left: 0; padding-bottom: 72px; }
   .page-content { padding: 16px; }
   .top-bar { padding: 8px 16px; }
+  .top-bar-actions .top-bar-account { display: inline-flex; }
   .top-bar-slogan { display: none; }
   .top-bar-title { font-size: var(--fs-base); }
   .card { padding: 16px 18px; }
@@ -3210,6 +3212,10 @@ button.quick-card:hover { background: var(--c-surface); }
   padding: 32px;
   position: relative;
   animation: onboarding-slide-up 0.3s ease-out;
+}
+#webUsageGuide .onboarding-content {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 @keyframes onboarding-slide-up {
   from { transform: translateY(20px); opacity: 0; }

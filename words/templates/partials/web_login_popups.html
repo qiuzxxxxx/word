@@ -1,0 +1,24 @@
+{% load static %}
+{% if server_mode %}
+  {% if has_login_popups or request.resolver_match.url_name == 'dashboard' %}
+    {% include 'partials/announcement_modal.html' %}
+  {% endif %}
+  {% if show_web_welcome %}
+  <div class="onboarding-modal hidden" id="webUsageGuide" role="dialog" aria-modal="true" aria-labelledby="webUsageGuideTitle">
+    <div class="onboarding-content">
+      <h2 id="webUsageGuideTitle">使用指南</h2>
+      <p class="onboarding-desc">从「总调度」查看今日学习任务。</p>
+      <div class="onboarding-features">
+        <div class="onboarding-feature"><i class="ph ph-book-open-text" aria-hidden="true"></i><span>在「背诵」学新词，在「复习」巩固到期词汇。</span></div>
+        <div class="onboarding-feature"><i class="ph ph-chart-line-up" aria-hidden="true"></i><span>在「统计」查看学习进度。</span></div>
+        <div class="onboarding-feature"><i class="ph ph-user-circle" aria-hidden="true"></i><span>在「我的」管理账号或联系管理员。</span></div>
+      </div>
+      <button class="btn btn-primary onboarding-btn" type="button" id="webUsageGuideClose">知道了</button>
+    </div>
+  </div>
+  {% endif %}
+  {% if has_login_popups %}
+  <div id="webLoginPopups" hidden data-url="{% url 'next_login_popup' %}" data-csrf="{{ csrf_token }}"></div>
+  <script defer src="{% static 'js/login_popups.js' %}?v=1"></script>
+  {% endif %}
+{% endif %}

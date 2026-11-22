@@ -1,0 +1,29 @@
+{% extends 'account_base.html' %}
+{% block title %}联系管理员 · 驻留集{% endblock %}
+{% block account_back %}
+<a class="account-back" href="{% if from_email %}{% url 'account_email' %}{% else %}{% url 'account_profile' %}{% endif %}">
+  <i class="ph ph-arrow-left" aria-hidden="true"></i>{% if from_email %}返回邮箱设置{% else %}返回我的{% endif %}
+</a>
+{% endblock %}
+{% block account_content %}
+<section class="account-panel account-panel--form" aria-labelledby="account-feedback-title">
+  <h1 id="account-feedback-title">联系管理员</h1>
+  {% if from_email %}<p class="account-muted">如果旧邮箱无法使用，可以留言请管理员协助核实账号归属。</p>{% endif %}
+  <form class="account-form" method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <fieldset class="account-category"{% if form.category.errors %} aria-describedby="{{ form.category.auto_id }}_error"{% endif %}>
+      <legend>{{ form.category.label }}</legend>
+      <div class="account-category-options">
+        {% for option in form.category %}
+        <label class="account-category-option" for="{{ option.id_for_label }}">{{ option.tag }}<span>{{ option.choice_label }}</span></label>
+        {% endfor %}
+      </div>
+      {{ form.category.errors }}
+    </fieldset>
+    {% include 'partials/account_field.html' with field=form.body %}
+    {% include 'partials/account_field.html' with field=form.contact %}
+    <div class="account-actions"><button class="btn btn-primary" type="submit">提交留言</button></div>
+  </form>
+</section>
+{% endblock %}

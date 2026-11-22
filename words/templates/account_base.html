@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/account.css' %}?v=3">
+{% endblock %}
+{% block page_title %}我的{% endblock %}
+{% block content %}
+<div class="account-page">
+  {% block account_back %}{% endblock %}
+  {% for message in messages %}
+  <p class="account-notice account-notice--success" role="status">
+    <i class="ph ph-check-circle" aria-hidden="true"></i>{{ message }}
+  </p>
+  {% endfor %}
+  {% block account_content %}{% endblock %}
+</div>
+{% endblock %}

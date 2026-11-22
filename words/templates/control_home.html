@@ -14,6 +14,7 @@
   <h1>站点管理</h1>
   <nav class="control-jump" aria-label="管理栏目">
     <a href="#users">用户</a><a href="#public-models">公共 AI</a><a href="#announcements">公告</a>
+    <a href="{% url 'control_feedback' %}">用户留言{% if pending_feedback %}（{{ pending_feedback }} 条待处理）{% endif %}</a>
   </nav>
 </header>
 

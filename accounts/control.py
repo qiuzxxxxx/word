@@ -5,10 +5,12 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -17,7 +19,7 @@ from words.secret_vault import encrypt
 from .ai_gateway import https_endpoint
 from .announcement_content import render_announcement
 from .auth import is_owner
-from .models import Account, Announcement, EmailCode, SharedModel, SiteState
+from .models import Account, Announcement, EmailCode, SharedModel, SiteState, SupportMessage
 from .usernames import AccountUsernameField, username_exists
 
 
@@ -136,8 +138,6 @@ def home(request):
     accounts = ordinary_accounts(request)
     if query:
         accounts = accounts.filter(Q(user__username__icontains=query) | Q(email__icontains=query))
-    from django.core.paginator import Paginator
-
     default_page_size = 20
     page_size_options = [10, 20, 50, 100]
     try:
@@ -159,9 +159,39 @@ def home(request):
         'elided_pages': elided_pages,
         'query': query,
         'announcements': Announcement.objects.all(),
+        'pending_feedback': SupportMessage.objects.filter(resolved_at__isnull=True).count(),
         'shared_models': SharedModel.objects.order_by('name', 'pk'),
         'site': request.site_state,
     })
+
+
+@require_http_methods(['GET'])
+def feedback_inbox(request):
+    if not is_owner(request.user):
+        raise PermissionDenied
+    show_resolved = request.GET.get('status') == 'resolved'
+    feedback = SupportMessage.objects.filter(resolved_at__isnull=not show_resolved).select_related('account__user')
+    page = Paginator(feedback, 20).get_page(request.GET.get('page'))
+    return render(request, 'control_feedback.html', {'feedback': page, 'show_resolved': show_resolved})
+
+
+@require_http_methods(['POST'])
+def feedback_status(request, pk):
+    if not is_owner(request.user):
+        raise PermissionDenied
+    operation = request.POST.get('operation')
+    if operation not in {'resolve', 'reopen'}:
+        raise Http404
+    with transaction.atomic():
+        entry = get_object_or_404(SupportMessage.objects.select_for_update(), pk=pk)
+        if operation == 'resolve' and entry.resolved_at is None:
+            entry.resolved_at = timezone.now()
+            entry.save(update_fields=['resolved_at'])
+        elif operation == 'reopen' and entry.resolved_at is not None:
+            entry.resolved_at = None
+            entry.save(update_fields=['resolved_at'])
+    inbox = reverse('control_feedback')
+    return redirect(f'{inbox}?status=resolved' if operation == 'reopen' else inbox)
 
 
 @require_http_methods(['POST'])

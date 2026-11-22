@@ -1,0 +1,58 @@
+{% extends 'account_base.html' %}
+{% block title %}{% if account.email %}换绑邮箱{% else %}绑定邮箱{% endif %} · 驻留集{% endblock %}
+{% block account_back %}
+<a class="account-back" href="{% url 'account_profile' %}"><i class="ph ph-arrow-left" aria-hidden="true"></i>返回我的</a>
+{% endblock %}
+{% block account_content %}
+<section class="account-panel account-panel--form" aria-labelledby="account-email-title">
+  <h1 id="account-email-title">{% if account.email %}换绑邮箱{% else %}绑定邮箱{% endif %}</h1>
+  {% if unavailable %}
+  <p class="account-notice account-notice--error" role="status">邮箱验证暂不可用，请稍后再试。</p>
+  {% else %}
+    {% if account.email %}
+    <ol class="account-steps" aria-label="换绑步骤">
+      <li{% if not old_verified %} aria-current="step"{% endif %}>
+        {% if old_verified %}<i class="ph ph-check-circle" aria-hidden="true"></i><span>旧邮箱已验证</span>{% else %}<span>验证旧邮箱</span>{% endif %}
+      </li>
+      <li{% if old_verified %} aria-current="step"{% endif %}><span>验证新邮箱</span></li>
+    </ol>
+    {% endif %}
+    {% if send_error %}<p class="account-notice account-notice--error" role="alert">{{ send_error }}</p>{% endif %}
+    {% if account.email and not old_verified %}
+    <div class="account-form-intro">
+      <p>当前绑定邮箱 <strong>{{ account.email }}</strong></p>
+      <p class="account-muted">验证码有效期为 {{ code_minutes }} 分钟。</p>
+    </div>
+    <form class="account-form" method="post">
+      {% csrf_token %}
+      {% if show_old_code %}{% include 'partials/account_field.html' with field=old_form.code %}{% endif %}
+      <div class="account-actions">
+        {% if show_old_code %}
+        <button class="btn btn-primary" type="submit" name="action" value="verify_old">验证旧邮箱</button>
+        {% endif %}
+        <button class="btn {% if show_old_code %}btn-secondary{% else %}btn-primary{% endif %}" type="submit" name="action" value="send_old" formnovalidate>{% if show_old_code %}重新发送{% else %}向旧邮箱发送验证码{% endif %}</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="account-form-intro account-muted">
+      {% if old_verified %}<p>请在 {{ code_minutes }} 分钟内完成新邮箱验证。</p>{% else %}<p>绑定后可用邮箱登录和找回密码。</p>{% endif %}
+      {% if new_code_email %}<p>验证码已发送至 <strong>{{ new_code_email }}</strong>。</p>{% endif %}
+    </div>
+    <form class="account-form" method="post">
+      {% csrf_token %}
+      {% include 'partials/account_field.html' with field=new_form.email %}
+      {% if show_new_code %}{% include 'partials/account_field.html' with field=new_form.code %}{% endif %}
+      <div class="account-actions">
+        {% if show_new_code %}
+        <button class="btn btn-primary" type="submit" name="action" value="verify_new">{% if account.email %}确认换绑{% else %}确认绑定{% endif %}</button>
+        {% endif %}
+        <button class="btn {% if show_new_code %}btn-secondary{% else %}btn-primary{% endif %}" type="submit" name="action" value="send_new" formnovalidate>{% if new_code_email %}重新发送{% else %}向新邮箱发送验证码{% endif %}</button>
+      </div>
+    </form>
+    {% endif %}
+  {% endif %}
+  {% if account.email and not old_verified %}
+  <p><a class="account-text-link" href="{% url 'account_feedback' %}?category=email-access">无法访问？跟管理员留言</a></p>
+  {% endif %}
+</section>
+{% endblock %}

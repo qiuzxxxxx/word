@@ -1,6 +1,6 @@
-<!-- 用户许可与使用协议：首次使用强制同意（gate）；设置页可随时查看（viewer） -->
+<!-- 桌面版首次使用显示同意门禁，网页版可从账号页查看或同意协议。 -->
 <div id="privacyMask"
-     class="modal-overlay privacy-mask{% if privacy_agreed %} hidden{% else %} privacy-gate{% endif %}"
+     class="modal-overlay privacy-mask{% if server_mode or privacy_agreed %} hidden{% else %} privacy-gate{% endif %}"
      data-version="{{ privacy_version }}"
      onclick="if(event.target===this && !this.classList.contains('privacy-gate')) PrivacyUI.close()">
   <div class="modal privacy-modal" role="dialog" aria-modal="true" aria-label="用户许可与使用协议">
@@ -61,6 +61,9 @@
   var exitNote = document.getElementById('privacyExitNote');
   var AGREE_URL = '{% url "words:api_privacy_agree" %}';
   var CURRENT_VERSION = '{{ privacy_version }}';
+  var manualConsent = false;
+  var afterViewerClose = null;
+  var previousFocus = null;
 
   function isGate() { return mask.classList.contains('privacy-gate'); }
 
@@ -83,24 +86,42 @@
   function applyMode() {
     var gate = isGate();
     closeX.classList.toggle('hidden', gate);
-    agreeBtn.classList.toggle('hidden', !gate);
+    agreeBtn.classList.toggle('hidden', !gate && !manualConsent);
     disagreeBtn.classList.toggle('hidden', !gate);
     viewerCloseBtn.classList.toggle('hidden', gate);
   }
 
   function closeViewer() {
-    if (isGate()) return; // 首次使用强制态不允许关闭
+    if (isGate() || mask.classList.contains('hidden')) return;
     mask.classList.add('hidden');
+    lockBackgroundScroll(false);
+    if (previousFocus) previousFocus.focus();
+    var onClose = afterViewerClose;
+    afterViewerClose = null;
+    if (onClose) onClose();
   }
 
-  // 供设置页 / 其他入口调用：以"查看"模式打开
-  window.openPrivacy = function () {
+  function openViewer(canAgree, onClose) {
+    previousFocus = document.activeElement;
+    manualConsent = canAgree;
+    afterViewerClose = onClose;
+    viewerCloseBtn.textContent = onClose ? '继续' : '关闭';
     mask.classList.remove('privacy-gate');
     showStatement();
     applyMode();
     mask.classList.remove('hidden');
+    lockBackgroundScroll(true);
+    (manualConsent ? agreeBtn : viewerCloseBtn).focus();
+  }
+
+  window.openPrivacy = function (onClose) {
+    openViewer(false, typeof onClose === 'function' ? onClose : null);
   };
-  window.PrivacyUI = { open: window.openPrivacy, close: closeViewer };
+  window.PrivacyUI = {
+    open: window.openPrivacy,
+    close: closeViewer,
+    openConsent: function () { openViewer(true, null); }
+  };
 
   closeX.addEventListener('click', closeViewer);
   viewerCloseBtn.addEventListener('click', closeViewer);
@@ -135,14 +156,19 @@
       return VOCAB_API.post(AGREE_URL, { text_hash: textHash });
     }).then(function (d) {
       if (d && d.success) {
+        manualConsent = false;
         mask.classList.remove('privacy-gate');
-        mask.classList.add('hidden');
+        closeViewer();
         showStatement();
         applyMode();
-        lockBackgroundScroll(false);
         showToast('已同意《用户许可与使用协议》，欢迎使用', 'success');
         var line = document.getElementById('privacyStatusLine');
         if (line) line.textContent = '您已同意 ' + (d.version || CURRENT_VERSION) + ' 版协议';
+        var profileConsent = document.getElementById('privacyProfileConsent');
+        if (profileConsent) {
+          profileConsent.textContent = '查看协议';
+          profileConsent.onclick = window.openPrivacy;
+        }
       } else {
         appAlert((d && d.error) || '保存失败，请重试');
       }

@@ -1,0 +1,68 @@
+{% extends 'account_base.html' %}
+{% block title %}我的 · 驻留集{% endblock %}
+{% block account_content %}
+<header class="account-heading">
+  <span class="account-avatar" aria-hidden="true"><i class="ph ph-user-circle"></i></span>
+  <div>
+    <p class="account-muted">用户名</p>
+    <h1>{{ request.user.username }}</h1>
+  </div>
+</header>
+
+<div class="account-columns">
+  <section class="account-panel" aria-labelledby="account-security-title">
+    <h2 id="account-security-title">账号与隐私</h2>
+    <div class="account-row">
+      <i class="ph ph-envelope-simple" aria-hidden="true"></i>
+      <div class="account-row-content">
+        <h3>绑定邮箱</h3>
+        {% if account.email %}
+        <p class="account-muted">{{ account.email }}</p>
+        {% else %}
+        <p class="account-muted">未绑定。绑定后可用邮箱登录和找回密码。</p>
+        {% endif %}
+      </div>
+      <a class="btn {% if account.email %}btn-secondary{% else %}btn-primary{% endif %}" href="{% url 'account_email' %}">{% if account.email %}换绑邮箱{% else %}绑定邮箱{% endif %}</a>
+    </div>
+    <div class="account-row">
+      <i class="ph ph-lock-key" aria-hidden="true"></i>
+      <div class="account-row-content">
+        <h3>登录密码</h3>
+        <p class="account-muted">使用当前密码确认修改。</p>
+      </div>
+      <a class="btn btn-secondary" href="{% url 'account_password' %}">修改密码</a>
+    </div>
+    <div class="account-row" id="account-privacy">
+      <i class="ph ph-shield-check" aria-hidden="true"></i>
+      <div class="account-row-content">
+        <h3>用户许可与使用协议</h3>
+        <p class="account-muted" id="privacyStatusLine">{% if privacy_agreed %}已同意 {{ privacy_version }} 版协议{% else %}尚未同意最新版协议{% endif %}</p>
+      </div>
+      {% if privacy_agreed %}
+      <button class="btn btn-secondary" type="button" onclick="openPrivacy()">查看协议</button>
+      {% else %}
+      <button class="btn btn-secondary" type="button" id="privacyProfileConsent" onclick="PrivacyUI.openConsent()">阅读并同意</button>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="account-panel" aria-labelledby="account-shortcuts-title">
+    <h2 id="account-shortcuts-title">快捷入口</h2>
+    <a class="account-link" href="{% url 'words:statistics' %}">
+      <i class="ph ph-trend-up" aria-hidden="true"></i><span>学习统计</span><i class="ph ph-caret-right" aria-hidden="true"></i>
+    </a>
+    <a class="account-link" href="{% url 'words:settings_page' %}">
+      <i class="ph ph-gear" aria-hidden="true"></i><span>应用设置</span><i class="ph ph-caret-right" aria-hidden="true"></i>
+    </a>
+    <a class="account-link" href="{% url 'account_feedback' %}">
+      <i class="ph ph-chat-circle-text" aria-hidden="true"></i><span>联系管理员</span><i class="ph ph-caret-right" aria-hidden="true"></i>
+    </a>
+    <form method="post" action="{% url 'owner_logout' %}">
+      {% csrf_token %}
+      <button class="account-link" type="submit">
+        <i class="ph ph-sign-out" aria-hidden="true"></i><span>退出登录</span>
+      </button>
+    </form>
+  </section>
+</div>
+{% endblock %}

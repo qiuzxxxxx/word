@@ -141,6 +141,9 @@ def verify():
     assert first.get('/admin/').status_code == 404
     assert first.get('/').status_code == 200 and second.get('/settings/').status_code == 200
     assert b'privacy-mask hidden' in first.get('/').content
+    for popup in ('agreement', 'guide', ''):
+        assert post(first, '/api/login-popups/next/').json()['popup'] == popup
+    assert post(second, '/api/login-popups/next/').json()['popup'] == ''
     assert second.get('/api/achievements/').json()['total_count'] == 14
     assert b'legacy-owner-word' not in first.get('/api/backup/').content
     assert b'legacy-owner-word' in supervisor.get('/api/backup/').content
@@ -245,7 +248,8 @@ def verify():
     login(second, 'cs', password=new_password)
 
     # Email password reset and change verification
-    assert b'/password-reset/' in alternate.get('/settings/').content
+    assert b'/my/password/' in alternate.get('/my/').content
+    assert b'/password-reset/' in alternate.get('/my/password/').content
     login_page = browser().get('/login/')
     assert b'/password-reset/' in login_page.content
     assert b'site-record' in login_page.content
@@ -289,9 +293,13 @@ def verify():
     })
     assert res_bad.status_code == 200 and '验证码错误'.encode() in res_bad.content
 
-    res_ok = post(reset_client, '/password-reset/', {
-        'email': 'alice@example.com', 'code': r_code, 'new_password': alice_new_pw, 'password_confirm': alice_new_pw
-    })
+    with patch('accounts.registration.urlopen') as send_request:
+        send_request.return_value.__enter__.return_value.status = 200
+        res_ok = post(reset_client, '/password-reset/', {
+            'email': 'alice@example.com', 'code': r_code, 'new_password': alice_new_pw, 'password_confirm': alice_new_pw
+        })
+        notice = json.loads(send_request.call_args.args[0].data)
+        assert notice['to'] == ['alice@example.com'] and notice['subject'] == '驻留集｜登录密码已修改'
     assert res_ok.status_code == 302 and res_ok['Location'].endswith('/login/?reset_success=1')
     assert not EmailCode.objects.filter(email='alice@example.com').exists()
 

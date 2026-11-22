@@ -31,7 +31,7 @@
     <a href="#sec-cost" data-tab="sec-cost"><i class="ph ph-coins"></i> AI 成本</a>
     <a href="#sec-display" data-tab="sec-display"><i class="ph ph-palette"></i> 外观与主题</a>
     <a href="#sec-data" data-tab="sec-data"><i class="ph ph-database"></i> 数据备份与恢复</a>
-    <a href="#sec-privacy" data-tab="sec-privacy"><i class="ph ph-shield-check"></i> 隐私与许可</a>
+    {% if not server_mode %}<a href="#sec-privacy" data-tab="sec-privacy"><i class="ph ph-shield-check"></i> 隐私与许可</a>{% endif %}
     <a href="#sec-about" data-tab="sec-about"><i class="ph ph-info"></i> 关于</a>
   </nav>
 
@@ -344,6 +344,7 @@
     </div>
 
     <!-- ============ 隐私与许可 ============ -->
+    {% if not server_mode %}
     <div class="card" id="sec-privacy">
       <div class="card-header"><i class="ph ph-shield-check" style="color: var(--c-green);"></i> 隐私与许可</div>
 
@@ -361,20 +362,8 @@
           {% endif %}
         </div>
       </div>
-      {% if server_mode %}
-      <div class="about-block" style="margin-top: 14px;">
-        <div class="about-block-title"><i class="ph ph-lock-key" style="color: var(--c-blue);"></i> 账号安全</div>
-        <div class="text-secondary text-sm" style="margin-bottom: 10px;">
-          绑定邮箱：<strong>{{ request.user.email|default:'未绑定' }}</strong>
-        </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'password_reset' %}" class="btn btn-secondary btn-xs">
-            <i class="ph ph-key"></i> 修改密码
-          </a>
-        </div>
-      </div>
-      {% endif %}
     </div>
+    {% endif %}
 
     <!-- ============ 关于 ============ -->
     <div class="card" id="sec-about">
@@ -822,7 +811,7 @@ document.addEventListener('keydown', function (e) {
 // 旧版页面用 URL 锚点直达分区（如 #ai-models），这里统一换成标签切换，
 // 并把上次看的分区记在本机，下次打开直接回到那一个。
 var SETTINGS_TAB_KEY = 'vocab-settings-tab';
-var SETTINGS_TABS = ['sec-learning', 'sec-ai', 'sec-cost', 'sec-display', 'sec-data', 'sec-privacy', 'sec-about'];
+var SETTINGS_TABS = ['sec-learning', 'sec-ai', 'sec-cost', 'sec-display', 'sec-data', {% if not server_mode %}'sec-privacy', {% endif %}'sec-about'];
 // 兼容旧锚点：其它页面深链过来的 hash 可能不是分区 id，
 // 旧分区「发音（sec-speech）/日均目标（sec-daily）」已并入「学习偏好（sec-learning）」
 var SETTINGS_LEGACY_HASH = { 'ai-models': 'sec-ai', 'sec-speech': 'sec-learning', 'sec-daily': 'sec-learning' };
@@ -859,6 +848,12 @@ function resolveInitialTab() {
 }
 
 function initSettingsTabs() {
+  {% if server_mode %}
+  if (location.hash === '#sec-privacy') {
+    location.replace('{% url "account_profile" %}#account-privacy');
+    return;
+  }
+  {% endif %}
   document.querySelectorAll('.settings-nav a').forEach(function (a) {
     a.addEventListener('click', function (e) {
       e.preventDefault();

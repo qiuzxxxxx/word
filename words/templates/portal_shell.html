@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
   <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
   <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=363">
-  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=4">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=367">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}?v=5">
   <link rel="stylesheet" href="{% static 'vendor/phosphor/regular/style.css' %}?v=211">
   {% include 'partials/browser_storage.html' %}
   <script>
@@ -39,5 +39,9 @@
     {% block portal %}{% endblock %}
   </main>
   {% block portal_footer %}{% endblock %}
+  {% if has_login_popups %}
+    {% if show_web_welcome %}{% include 'partials/privacy_modal.html' %}{% endif %}
+    {% include 'partials/web_login_popups.html' %}
+  {% endif %}
 </body>
 </html>

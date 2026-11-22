@@ -215,9 +215,10 @@ def dashboard(request):
         'heatmap_days': heatmap_days,
         'total_study_days': total_study_days,
         'today_duration': today_duration,
-        # 新手引导状态：无学习记录且未完成引导时显示
+        # 桌面引导独立于网页版的注册和登录流程。
         'show_onboarding': (
-            not request.session.get('onboarding_done')
+            not getattr(settings, 'SERVER_MODE', False)
+            and not request.session.get('onboarding_done')
             and StudyProgress.objects.count() == 0
         ),
     }

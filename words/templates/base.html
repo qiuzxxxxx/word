@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
   <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
   <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=364">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=367">
   <!-- Phosphor 图标字体（随程序打包的本地静态资源，离线可用，不发起任何外网请求） -->
   <link rel="stylesheet" href="{% static 'vendor/phosphor/regular/style.css' %}?v=211">
   <link rel="stylesheet" href="{% static 'vendor/phosphor/fill/style.css' %}?v=211">
@@ -76,6 +76,11 @@
         <a href="{% url 'words:dashboard' %}" data-nav="dashboard">
           <i class="ph ph-chart-bar"></i> <span>总调度</span>
         </a>
+        {% if server_mode %}
+        <a href="{% url 'account_profile' %}" data-nav="account"{% if request.resolver_match.url_name == 'account_profile' %} aria-current="page"{% elif request.resolver_match.url_name == 'account_email' or request.resolver_match.url_name == 'account_password' or request.resolver_match.url_name == 'account_feedback' %} aria-current="location"{% endif %}>
+          <i class="ph ph-user-circle" aria-hidden="true"></i> <span>我的</span>
+        </a>
+        {% endif %}
 
         <div class="nav-group" data-group="words">
           <div class="nav-group-title">词库</div>
@@ -162,18 +167,12 @@
           {% endif %}
           {% if server_mode %}
           {% if can_manage_site %}<a class="btn btn-secondary btn-sm" href="{% url 'site_control' %}">管理端</a>{% endif %}
-          <form method="post" action="{% url 'owner_logout' %}">
-            {% csrf_token %}
-            <button class="btn btn-secondary btn-sm" type="submit">退出登录</button>
-          </form>
+          <a class="btn btn-secondary btn-sm top-bar-account" href="{% url 'account_profile' %}"{% if request.resolver_match.url_name == 'account_profile' %} aria-current="page"{% endif %}><i class="ph ph-user-circle" aria-hidden="true"></i> 我的</a>
           {% endif %}
         </div>
       </div>
 
       <div class="page-content">
-        {% if request.path == '/' or request.resolver_match.url_name == 'dashboard' %}
-        {% include 'partials/announcement_modal.html' %}
-        {% endif %}
         {% block content %}{% endblock %}
       </div>
     </main>
@@ -182,8 +181,8 @@
   <!-- AI 模型配置独立窗口（API 填写，全局可用） -->
   {% include 'partials/ai_model_modal.html' %}
 
-  <!-- 用户许可与使用协议：首次使用强制同意；设置页可随时查看 -->
   {% include 'partials/privacy_modal.html' %}
+  {% include 'partials/web_login_popups.html' %}
 
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
@@ -572,7 +571,8 @@
     navEls.forEach(function(a) { a.classList.remove('active'); });
     for (var i = navEls.length - 1; i >= 0; i--) {
       var href = navEls[i].getAttribute('href');
-      if (path === href || (href.indexOf('/workshop/') !== -1 && path.indexOf('/workshop/') === 0)) {
+      var section = navEls[i].dataset.nav === 'account' || navEls[i].dataset.nav === 'workshop';
+      if (path === href || (section && path.indexOf(href) === 0)) {
         navEls[i].classList.add('active'); return;
       }
     }

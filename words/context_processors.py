@@ -33,7 +33,9 @@ def privacy(request):
         from accounts.models import Announcement
 
         portal = {'can_manage_site': is_owner(request.user),
-                  'site_announcements': list(Announcement.objects.filter(published=True)[:50])}
+                  'site_announcements': list(Announcement.objects.filter(published=True)[:50]),
+                  'show_web_welcome': bool(account.welcome_step),
+                  'has_login_popups': bool(account.welcome_step or account.announcement_pending)}
     return {
         'server_mode': server_mode,
         'privacy_version': current,

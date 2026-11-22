@@ -5,14 +5,18 @@ import jwt
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.backends import ModelBackend
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.cache import add_never_cache_headers
 from django.utils.crypto import constant_time_compare, salted_hmac
+from django.views.decorators.http import require_POST
 
-from .models import Account, SiteState
+from .models import Account, Announcement, SiteState
 from .workspaces import user_workspace
 
 
@@ -75,7 +79,7 @@ class PortalLogin(LoginView):
         login_id = secrets.token_urlsafe(32)
         updated = Account.objects.filter(
             pk=account.pk, deleted_at__isnull=True, user__is_active=True, user__password=user.password,
-        ).update(login_id=login_id)
+        ).update(login_id=login_id, announcement_pending=True)
         if not updated:
             form.add_error(None, '该账号无法登录。')
             return self.form_invalid(form)
@@ -105,6 +109,35 @@ class PortalLogout(LogoutView):
         samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
         response.delete_cookie(COOKIE, samesite=samesite)
         return response
+
+
+def lock_current_account(request):
+    account = Account.objects.select_for_update().select_related('user').filter(
+        pk=request.user.pk, login_id=request.login_account.login_id, deleted_at__isnull=True,
+        user__is_active=True, user__password=request.user.password,
+    ).first()
+    if account is None:
+        raise PermissionDenied
+    return account
+
+
+@login_required
+@require_POST
+def next_login_popup(request):
+    with transaction.atomic():
+        account = lock_current_account(request)
+        popup = account.welcome_step
+        if popup:
+            account.welcome_step = (
+                Account.WelcomeStep.GUIDE if popup == Account.WelcomeStep.AGREEMENT else Account.WelcomeStep.DONE
+            )
+            account.save(update_fields=['welcome_step'])
+        elif account.announcement_pending:
+            account.announcement_pending = False
+            account.save(update_fields=['announcement_pending'])
+            if Announcement.objects.filter(published=True).exists():
+                popup = 'announcement'
+    return JsonResponse({'popup': popup})
 
 
 class ServerAccessMiddleware:

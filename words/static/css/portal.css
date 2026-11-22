@@ -169,6 +169,11 @@
   border-radius: var(--radius-sm);
 }
 .control-pagination { margin-top: 1rem; }
+.control-feedback-list { margin-top: 0; }
+.control-feedback-list .control-row:first-child { border-top: 0; padding-top: 0; }
+.control-feedback-contact { margin-block: .5rem; }
+.control-feedback-contact span { color: var(--c-text); }
+.control-feedback-body { max-width: 72ch; }
 
 .portal-auth .portal-main { width: min(31rem, calc(100% - 2rem)); align-content: center; }
 .portal-auth-panel, .portal-edit { padding: clamp(1.25rem, 4vw, 2rem); }
