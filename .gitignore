@@ -4,19 +4,56 @@ _check.js
 # Python 缓存
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
 
-# 数据库与本地数据（含个人学习数据，勿提交到公开仓库）
-db.sqlite3
+# 运行环境、签名密钥、发信与 AI 凭据
+.env
+.env.*
+.envrc
+*.env
+*.env.*
 .django_secret
+.web-secrets.json
+keys.json
+secrets.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# 本地数据库、学习记录、邮件和数据导出
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+learners/
 backups/
+backup_*.json
+lexizx_my_data_*.json
+dump*.sql
+backup*.sql
 media/
+mail/
+*.eml
+latest-code.txt
 
 # 其他
 *.log
 .DS_Store
 
-# 交接文档（仅本机维护，不上传公开仓库）
+# 本地交接、私人部署说明和服务器快照
 HANDOVER.md
+*.local.md
+lexizx-backup.*/
+lexizx-upload.*/
+lexizx-rollback.*/
 
 # 打包产物（中间 build 与产物均为可再生，日常清理）
 dist/
@@ -24,5 +61,5 @@ build/
 product/dist/
 product/build/
 packaging/
-
-
+lexizx-*.tar.gz
+lexizx-*.tar.gz.sha256

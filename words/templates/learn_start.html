@@ -443,12 +443,12 @@ async function deletePreset(btn) {
 // —— 断点续背：读取 localStorage 快照（由背诵页 persistResume 写入）——
 var RESUME_KEY = 'vocab-learn-resume';
 var resumeData = null;
-try { resumeData = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); } catch (e) { resumeData = null; }
+try { resumeData = JSON.parse(window.vocabLocalStorage.getItem(RESUME_KEY) || 'null'); } catch (e) { resumeData = null; }
 (function initResumeCard() {
   if (!resumeData || !Array.isArray(resumeData.words) || !resumeData.words.length) return;
   var total = resumeData.words.length;
   var done = Math.min(parseInt(resumeData.index, 10) || 0, total);
-  if (done >= total) { try { localStorage.removeItem(RESUME_KEY); } catch (e) {} resumeData = null; return; }
+  if (done >= total) { try { window.vocabLocalStorage.removeItem(RESUME_KEY); } catch (e) {} resumeData = null; return; }
   var modeText = ({ sequential: '顺序', random: '乱序', cover_en: '遮英文', cover_zh: '遮中文' })[resumeData.mode] || '背诵';
   var checkText = ({ none: '纯背诵', spelling: '拼写检测', meaning: '释义默写', gates: '高效背诵' })[resumeData.checkMode] || '';
   var timeText = '';
@@ -475,7 +475,7 @@ function resumeLearn() {
 }
 
 function discardResume() {
-  try { localStorage.removeItem(RESUME_KEY); } catch (e) {}
+  try { window.vocabLocalStorage.removeItem(RESUME_KEY); } catch (e) {}
   resumeData = null;
   var card = document.getElementById('resumeCard');
   if (card) card.classList.add('hidden');

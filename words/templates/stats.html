@@ -190,7 +190,7 @@
 var trendChart = null;
 var categoryChart = null;
 var levelChart = null;
-var currentPeriod = sessionStorage.getItem('vocab-stats-period') || '7';
+var currentPeriod = window.vocabSessionStorage.getItem('vocab-stats-period') || '7';
 
 // ===== Period Switcher =====
 function applyPeriodUI() {
@@ -206,7 +206,7 @@ function applyPeriodUI() {
 document.querySelectorAll('.period-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
     currentPeriod = this.dataset.period;
-    sessionStorage.setItem('vocab-stats-period', currentPeriod);
+    window.vocabSessionStorage.setItem('vocab-stats-period', currentPeriod);
     applyPeriodUI();
     loadStats();
   });

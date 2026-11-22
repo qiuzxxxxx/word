@@ -33,6 +33,9 @@ from django.db import IntegrityError
 from django.views.decorators.http import require_http_methods
 
 from ..secret_vault import VaultError, decrypt as decrypt_secret, encrypt as encrypt_secret
+from accounts.workspaces import learning_db, user_workspace
+
+_server_import_ai_slot = threading.BoundedSemaphore(1)
 from ..recitation_levels import get_recitation_level
 from .update import (
     api_check_update, api_update_download, api_update_download_status,
@@ -2239,7 +2242,7 @@ def _finalize_pending_judgment(pj, verdict, comment, source, by, data=None):
     verdict ∈ correct/partial/wrong；by ∈ ai/manual。返回 (ok, message)。"""
     if verdict not in ('correct', 'partial', 'wrong'):
         return False, '无效的判定结论'
-    with transaction.atomic():
+    with transaction.atomic(using=learning_db()):
         fresh = PendingJudgment.objects.select_for_update().get(pk=pj.pk)
         if fresh.resolved or fresh.applied:
             return True, '已复核'
@@ -3353,10 +3356,15 @@ def api_privacy_agree(request):
     if not re.fullmatch(r'[0-9a-f]{64}', text_hash):
         text_hash = ''
 
-    user_settings = UserSettings.get_settings()
-    user_settings.privacy_agreed_version = settings.PRIVACY_VERSION
-    user_settings.privacy_agreed_hash = text_hash
-    user_settings.save(update_fields=['privacy_agreed_version', 'privacy_agreed_hash'])
+    account = getattr(request, 'login_account', None)
+    record = account if account else UserSettings.get_settings()
+    record.privacy_agreed_version = settings.PRIVACY_VERSION
+    record.privacy_agreed_hash = text_hash
+    fields = ['privacy_agreed_version', 'privacy_agreed_hash']
+    if account:
+        record.privacy_agreed_at = timezone.now()
+        fields.append('privacy_agreed_at')
+    record.save(update_fields=fields)
     return JsonResponse({
         'success': True,
         'version': settings.PRIVACY_VERSION,
@@ -3518,11 +3526,11 @@ def _build_backup_payload(settings_obj):
                 'id': m.id, 'provider': m.provider, 'model_id': m.model_id,
                 'display_name': m.display_name, 'base_url': m.base_url,
                 'endpoint': m.endpoint,
-                'api_key': m.api_key,
+                'api_key': '' if getattr(settings, 'SERVER_MODE', False) else m.api_key,
                 'context': m.context,
                 'vision': m.vision, 'enabled': m.enabled,
             }
-            for m in AIModel.objects.all()
+            for m in AIModel.objects.filter(shared_model_id__isnull=True)
         ],
         'conversations': [
             {'id': c.id, 'title': c.title, 'created_at': c.created_at.isoformat()}
@@ -3778,7 +3786,8 @@ def api_restore(request):
     - AIModel / Conversation / WritingPractice 内部 id 做映射
     - 事务级关闭 FK 约束，恢复完恢复
     """
-    from django.db import connection, transaction
+    from django.db import connections
+    connection = connections[learning_db()]
     try:
         if request.FILES.get('file'):
             content = request.FILES['file'].read().decode('utf-8')
@@ -3844,7 +3853,7 @@ def api_restore(request):
         with connection.cursor() as cur:
             cur.execute('PRAGMA foreign_keys = OFF')
         try:
-            with transaction.atomic():
+            with transaction.atomic(using=learning_db()):
                 # --- 0) 补齐词库：v2.1 备份携带 units+words，只增不改 ---
                 units_added = 0
                 words_added = 0
@@ -3903,21 +3912,24 @@ def api_restore(request):
                 # --- 1) AI 模型（必须先恢复，其他表 FK 引用模型 id）---
                 id_map = {}
                 if data.get('ai_models'):
-                    AIModel.objects.all().delete()
+                    AIModel.objects.filter(shared_model_id__isnull=True).delete()
                     for m in data['ai_models']:
                         old_id = m.get('id')
                         plain = m.get('api_key', '') or ''
-                        m2 = AIModel.objects.create(
+                        m2 = AIModel(
                             provider=m.get('provider', 'openai'),
                             model_id=m['model_id'],
                             display_name=m.get('display_name', ''),
                             base_url=m.get('base_url', 'https://api.openai.com/v1'),
                             endpoint=m.get('endpoint', ''),
-                            api_key=plain,
+                            api_key=plain if not getattr(settings, 'SERVER_MODE', False) else '',
                             context=m.get('context', '128K'),
                             vision=m.get('vision', True),
                             enabled=m.get('enabled', True),
                         )
+                        if plain and getattr(settings, 'SERVER_MODE', False):
+                            _store_model_key(m2, plain)
+                        m2.save()
                         if old_id:
                             id_map[old_id] = m2.id
 
@@ -4508,7 +4520,7 @@ def api_quick_memory_generate(request, word_id):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with _open_ai_request(req, 120, cfg) as resp:
             raw = resp.read(5 * 1024 * 1024 + 1)
     except urllib.error.HTTPError as e:
         body = e.read(4096).decode('utf-8', 'ignore')
@@ -4612,7 +4624,7 @@ def api_assistant(request):
         role='user', content=user_text, word_id=word.id if word else None)
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with _open_ai_request(req, 120, cfg) as resp:
             raw = resp.read(5 * 1024 * 1024 + 1)
     except urllib.error.HTTPError as e:
         body = e.read(4096).decode('utf-8', 'ignore')
@@ -4848,7 +4860,7 @@ def api_ai_chat(request):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with _open_ai_request(req, 180, cfg) as resp:
             raw = resp.read(5 * 1024 * 1024 + 1)
     except urllib.error.HTTPError as e:
         body = e.read(4096).decode('utf-8', 'ignore')
@@ -5694,22 +5706,38 @@ def api_word_bulk_import(request):
 
         # 导入后自动 AI 补全（按词性释义 + 例句）改为后台异步执行：
         # 不让用户卡在导入按钮上，补全结果稍后自动出现在词库中；失败不影响导入结果。
-        if new_word_objs:
+        server_mode = getattr(settings, 'SERVER_MODE', False)
+        completing = bool(new_word_objs) and (not server_mode or _server_import_ai_slot.acquire(blocking=False))
+        if completing:
+            user_id = request.user.pk if server_mode else None
+            owner_workspace = learning_db() == 'default'
+
             def _async_complete(objs):
                 close_old_connections()
                 try:
-                    ai_complete_words(objs)
+                    if server_mode:
+                        with user_workspace(user_id, owner_workspace):
+                            ai_complete_words(objs)
+                    else:
+                        ai_complete_words(objs)
                 except Exception:
                     pass
                 finally:
                     close_old_connections()
-            threading.Thread(target=_async_complete, args=(new_word_objs,), daemon=True).start()
+                    if server_mode:
+                        _server_import_ai_slot.release()
+            try:
+                threading.Thread(target=_async_complete, args=(new_word_objs,), daemon=True).start()
+            except RuntimeError:
+                if server_mode:
+                    _server_import_ai_slot.release()
+                completing = False
 
         return JsonResponse({
             'success': True,
             'imported': imported,
             'skipped': skipped,
-            'completing': bool(new_word_objs),
+            'completing': completing,
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -6063,7 +6091,7 @@ def _ai_post_json(cfg, payload, timeout):
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _open_ai_request(req, timeout, cfg) as resp:
             raw = resp.read(5 * 1024 * 1024 + 1)
     except urllib.error.HTTPError as e:
         body = e.read(4096).decode('utf-8', 'ignore')
@@ -6377,12 +6405,20 @@ def resolve_ai_endpoint(base_url, endpoint):
     return base_url.rstrip('/') + '/chat/completions'
 
 
+def _open_ai_request(request, timeout, cfg):
+    if getattr(settings, 'SERVER_MODE', False):
+        from accounts.ai_gateway import open_ai_request
+
+        return open_ai_request(request, timeout, cfg)
+    return urllib.request.urlopen(request, timeout=timeout)
+
+
 def _model_has_key(m):
-    return bool(m.api_key_encrypted or m.api_key)
+    return bool(m.shared_model_id or m.api_key_encrypted or m.api_key)
 
 
 def _model_plain_key(m):
-    """按需解密密钥，并把旧版明文记录升级为 DPAPI 密文。"""
+    """按需解密密钥，并把旧版明文记录升级为密文。"""
     if m.api_key_encrypted:
         return decrypt_secret(m.api_key_encrypted)
     if not m.api_key:
@@ -6394,7 +6430,7 @@ def _model_plain_key(m):
 
 
 def _store_model_key(m, plain):
-    """密钥仅以 Windows 当前用户可解密的 DPAPI 密文写入本地数据库。"""
+    """将密钥以当前运行模式的密文格式写入数据库。"""
     m.api_key = ''
     m.api_key_encrypted = encrypt_secret(plain) if plain else ''
 
@@ -6426,7 +6462,19 @@ def serialize_ai_model(m):
         'context': m.context,
         'vision': m.vision,
         'enabled': m.enabled,
+        'is_public': bool(m.shared_model_id),
     }
+
+
+def _model_configuration(model):
+    cfg = serialize_ai_model(model)
+    if model.shared_model_id:
+        from accounts.ai_gateway import public_endpoint
+
+        cfg.update(endpoint=public_endpoint(model), api_key='', shared_model_id=model.shared_model_id)
+    else:
+        cfg['api_key'] = _model_plain_key(model)
+    return cfg
 
 
 def resolve_ai_model(data):
@@ -6442,9 +6490,7 @@ def resolve_ai_model(data):
             raise ValueError('指定的模型不存在，请到「设置 → AI 模型」中重新选择')
         if not m.enabled:
             raise ValueError('该模型已被禁用，请到「设置 → AI 模型」中启用')
-        cfg = serialize_ai_model(m)
-        cfg['api_key'] = _model_plain_key(m)
-        return cfg
+        return _model_configuration(m)
     # 旧版兼容：前端直接传 api_key/base_url/endpoint/model
     if data.get('model') or data.get('api_key') or data.get('base_url') or data.get('endpoint'):
         cfg = {
@@ -6465,9 +6511,7 @@ def resolve_ai_model(data):
     m = AIModel.objects.filter(enabled=True).order_by('id').first()
     if not m:
         raise ValueError('尚未配置 AI 模型，请先到「设置 → AI 模型」中添加并启用一个模型')
-    cfg = serialize_ai_model(m)
-    cfg['api_key'] = _model_plain_key(m)
-    return cfg
+    return _model_configuration(m)
 
 
 @require_http_methods(['GET', 'POST', 'DELETE'])
@@ -6491,7 +6535,10 @@ def api_ai_models(request):
         mid = body.get('id') or request.GET.get('id')
         if mid:
             try:
-                AIModel.objects.filter(id=int(mid)).delete()
+                model = AIModel.objects.filter(id=int(mid))
+                if model.exclude(shared_model_id=None).exists():
+                    return JsonResponse({'error': '公共模型由站主管理'}, status=403)
+                model.delete()
             except (ValueError, TypeError):
                 pass
         return JsonResponse({'success': True, 'deleted': mid})
@@ -6507,6 +6554,8 @@ def api_ai_models(request):
             m = AIModel.objects.get(id=int(mid))
         except (AIModel.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'error': '模型不存在'}, status=404)
+        if m.shared_model_id:
+            return JsonResponse({'error': '公共模型由站主管理'}, status=403)
     else:
         m = AIModel()
 
@@ -6622,7 +6671,7 @@ def api_ai_recognize(request):
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            with _open_ai_request(req, 180, cfg) as resp:
                 raw = resp.read(5 * 1024 * 1024 + 1)
         except urllib.error.HTTPError as e:
             body = e.read(4096).decode('utf-8', 'ignore')
@@ -6692,7 +6741,7 @@ def api_ai_review(request):
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            with _open_ai_request(req, 180, cfg) as resp:
                 raw = resp.read(5 * 1024 * 1024 + 1)
         except urllib.error.HTTPError as e:
             body = e.read(4096).decode('utf-8', 'ignore')
@@ -6848,16 +6897,21 @@ def api_ai_test(request):
     """测试 API 密钥与模型连通性（发送最小请求验证）"""
     try:
         data = json.loads(request.body)
+        cfg = {}
         # 支持只传 model_id：直接用库里已保存的配置（密钥从本机库读取，不经过前端）
         if data.get('model_id') and not data.get('api_key'):
             try:
                 saved = AIModel.objects.get(id=int(data['model_id']))
             except (AIModel.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'error': '模型不存在'}, status=404)
-            api_key = _model_plain_key(saved)
-            base_url = saved.base_url
-            endpoint = saved.endpoint
-            model = saved.model_id
+            try:
+                cfg = _model_configuration(saved)
+            except ValueError as error:
+                return JsonResponse({'error': str(error)}, status=400)
+            api_key = cfg['api_key']
+            base_url = cfg['base_url']
+            endpoint = cfg['endpoint']
+            model = cfg['model_id']
             model_pk = saved.id
         else:
             api_key = data.get('api_key', '')
@@ -6883,7 +6937,7 @@ def api_ai_test(request):
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with _open_ai_request(req, 30, cfg) as resp:
                 raw = resp.read(5 * 1024 * 1024 + 1)
         except urllib.error.HTTPError as e:
             body = e.read(4096).decode('utf-8', 'ignore')
@@ -6965,7 +7019,7 @@ def builtin_ai_exam_call(prompt, temperature=0.7, data=None, action='exam_genera
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
+        with _open_ai_request(req, 300, cfg) as resp:
             raw = resp.read(5 * 1024 * 1024 + 1)
         # 在 HTTP 请求完成后计算真实耗时（包含网络 + AI 生成时间）
         duration_ms = int((_time.monotonic() - t0) * 1000)
@@ -7985,7 +8039,13 @@ TRANS_REVIEW_INTERVAL_ERR = 1  # 未掌握下次复习间隔（天）
 
 
 def _request_user(request):
-    return request.user if getattr(request, 'user', None) and request.user.is_authenticated else None
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return None
+    if learning_db() == 'default':
+        return request.user
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.using(learning_db()).get(pk=request.user.pk)
 
 
 def _parse_practice_total(practice):
@@ -8802,7 +8862,7 @@ def _trans_run_paper(paper):
             break
 
         start_order = paper.questions.count() + 1
-        with transaction.atomic():
+        with transaction.atomic(using=learning_db()):
             for idx, item in enumerate(kept):
                 order = start_order + idx
                 note = f"AI组卷#{paper.id} {TRANS_PAPER_MODES.get(cfg.get('mode'), '')}"
@@ -9718,7 +9778,7 @@ def _cet6_run_paper(paper):
             break
 
         start_order = paper.questions.count() + 1
-        with transaction.atomic():
+        with transaction.atomic(using=learning_db()):
             for idx, item in enumerate(kept):
                 order = start_order + idx
                 note = f"AI组卷#{paper.id} {paper.get_mode_display()}"
@@ -10659,7 +10719,7 @@ def api_word_family_candidates(request):
 
     normalized_key = _normalize_family_key(clean['family']['key'])
     clean['family']['key'] = normalized_key
-    with transaction.atomic():
+    with transaction.atomic(using=learning_db()):
         # 写前规范化 key + get_or_create/唯一冲突兜底：已有同 key 词族一律不覆盖，
         # 转为可读的成功复用响应，避免唯一约束把 AI 成功后页面打成 500。
         existing = WordFamily.objects.filter(key=normalized_key).first()
@@ -10761,7 +10821,7 @@ def api_word_family_candidate_confirm(request, cid):
         family.save(update_fields=['title', 'description'])
 
     now = timezone.now()
-    with transaction.atomic():
+    with transaction.atomic(using=learning_db()):
         family.confirmed_at = now
         family.save(update_fields=['confirmed_at'])
         family.members.update(confirmed_at=now)
@@ -11254,10 +11314,9 @@ def api_achievements(request):
     
     # 获取或创建匿名用户（使用固定 ID）
     from django.contrib.auth.models import User
-    user, _ = User.objects.get_or_create(
-        id=1,
-        defaults={'username': 'local_user', 'is_active': False}
-    )
+    user = _request_user(request)
+    if user is None:
+        user, _ = User.objects.get_or_create(id=1, defaults={'username': 'local_user', 'is_active': False})
     
     all_achievements = get_user_achievements(user)
     recent = get_recent_achievements(user, limit=5)

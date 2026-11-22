@@ -167,7 +167,7 @@
 
       <p class="settings-sub">
         集中管理用于 <strong>AI 单词导入（图片 / 文本 / 文件识别）、AI 复审、速记生成、小助手问答</strong> 的模型。
-        未单独指定时各功能自动使用「已启用」的模型。API 密钥仅保存在本机数据库，不会上传服务器。
+        未单独指定时各功能自动使用「已启用」的模型。{% if server_mode %}可在下方为各功能选择个人模型或站点提供的公共模型。个人 API 密钥加密保存在你的账户数据库中。{% else %}API 密钥仅保存在本机数据库，不会上传服务器。{% endif %}
       </p>
 
       <div class="flex justify-between items-center" style="margin-bottom: 12px;">
@@ -350,7 +350,7 @@
       <div class="about-block accent-green">
         <div class="about-block-title"><i class="ph ph-shield-check" style="color: var(--c-green);"></i> 用户许可与使用协议</div>
         <div class="text-secondary text-sm" id="privacyStatusLine" style="margin-bottom: 10px;">
-          {% if privacy_agreed %}您已于本机同意 {{ privacy_version }} 版协议{% else %}您尚未同意最新版协议，部分功能暂不可用{% endif %}
+          {% if privacy_agreed %}您已同意 {{ privacy_version }} 版协议{% else %}您尚未同意最新版协议，部分功能暂不可用{% endif %}
         </div>
         <div class="flex items-center gap-2" style="flex-wrap: wrap;">
           <a href="javascript:void(0)" class="about-link" onclick="openPrivacy()">
@@ -374,12 +374,14 @@
             <span class="about-stat-title">版本</span>
           </div>
           <div class="stat-value">{{ app_version }}</div>
+          {% if not server_mode %}
           <div class="stat-label">
             <button type="button" class="update-check-btn" id="checkUpdateBtn" onclick="checkUpdate()">
               <i class="ph ph-arrows-clockwise"></i> 检查更新
             </button>
             <span class="update-check-status" id="updateCheckStatus" role="status" aria-live="polite">尚未检查</span>
           </div>
+          {% endif %}
         </div>
         <div class="stat-card">
           <div class="stat-card-head">
@@ -387,7 +389,7 @@
             <span class="about-stat-title">技术栈</span>
           </div>
           <div class="stat-value" style="font-size: 1rem;">Django · ECharts</div>
-          <div class="stat-label">WebView2 · TTS</div>
+          <div class="stat-label">{% if server_mode %}浏览器 · TTS{% else %}WebView2 · TTS{% endif %}</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-head">
@@ -459,6 +461,7 @@
   </div>
 </div>
 
+{% if not server_mode %}
 <!-- 检查更新弹窗 -->
 <div id="update-mask" class="donate-mask" onclick="if(event.target===this) closeUpdate()">
   <div class="donate-box update-box" role="dialog" aria-modal="true" aria-labelledby="update-title">
@@ -490,6 +493,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- 备份保存完成弹窗（Edge 下载完成提示风格） -->
 <div id="dlDoneMask" class="donate-mask" onclick="if(event.target===this) closeDlDone()">
@@ -536,6 +540,7 @@ function _closeMask(id) {
 }
 function openDonate() { _openMask('donate-mask'); }
 function closeDonate() { _closeMask('donate-mask'); }
+{% if not server_mode %}
 function closeUpdate() { _closeMask('update-mask'); }
 
 function setUpdateCheckStatus(message, state) {
@@ -784,12 +789,15 @@ function installUpdate() {
   });
 }
 
+{% endif %}
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
     var m = document.getElementById('donate-mask');
     if (m && m.style.display === 'flex') closeDonate();
+    {% if not server_mode %}
     var u = document.getElementById('update-mask');
     if (u && u.style.display === 'flex') closeUpdate();
+    {% endif %}
     var dl = document.getElementById('dlDoneMask');
     if (dl && dl.style.display === 'flex') closeDlDone();
   }
@@ -816,7 +824,7 @@ function switchTab(tabId, opts) {
   document.querySelectorAll('.settings-nav a').forEach(function (a) {
     a.classList.toggle('active', a.dataset.tab === tabId);
   });
-  try { localStorage.setItem(SETTINGS_TAB_KEY, tabId); } catch (e) {}
+  try { window.vocabLocalStorage.setItem(SETTINGS_TAB_KEY, tabId); } catch (e) {}
   if (opts.updateHash) {
     // 同步地址栏，便于收藏 / 分享到某个分区（不触发页面跳动）
     if (history.replaceState) history.replaceState(null, '', '#' + tabId);
@@ -831,7 +839,7 @@ function resolveInitialTab() {
   if (SETTINGS_LEGACY_HASH[hash]) return SETTINGS_LEGACY_HASH[hash];
   if (SETTINGS_TABS.indexOf(hash) !== -1) return hash;
   var saved = null;
-  try { saved = localStorage.getItem(SETTINGS_TAB_KEY); } catch (e) {}
+  try { saved = window.vocabLocalStorage.getItem(SETTINGS_TAB_KEY); } catch (e) {}
   return SETTINGS_TABS.indexOf(saved) !== -1 ? saved : SETTINGS_TABS[0];
 }
 
@@ -866,7 +874,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ===== Font Size =====
 function initFontButtons() {
   var currentSize = '{% if settings.font_size %}{{ settings.font_size }}{% else %}medium{% endif %}';
-  try { currentSize = localStorage.getItem('vocab-font-size') || currentSize; } catch (e) {}
+  try { currentSize = window.vocabLocalStorage.getItem('vocab-font-size') || currentSize; } catch (e) {}
   document.querySelectorAll('.font-size-btn').forEach(function (btn) {
     btn.className = 'btn btn-secondary btn-sm font-size-btn';
   });
@@ -887,7 +895,7 @@ function applyFontSize() {
   var selected = document.querySelector('.font-size-btn.btn-primary');
   if (!selected) return;
   var size = selected.dataset.size;
-  try { localStorage.setItem('vocab-font-size', size); } catch (e) {}
+  try { window.vocabLocalStorage.setItem('vocab-font-size', size); } catch (e) {}
   // Save to backend
   VOCAB_API.post('/api/settings/', { font_size: size }).then(function () {
     showToast('字体大小已更新为 ' + size, 'success');
@@ -909,7 +917,7 @@ function renderWallpaperList() {
   if (!wrap) return;
   WallpaperDB.getList().then(function (list) {
     var curId = null;
-    try { curId = localStorage.getItem('vocab-theme-wallpaper-id') || null; } catch (e) {}
+    try { curId = window.vocabLocalStorage.getItem('vocab-theme-wallpaper-id') || null; } catch (e) {}
     wrap.innerHTML = '';
     if (!list.length) return;
     list.forEach(function (it) {
@@ -963,7 +971,7 @@ window.addEventListener('vocab-wallpaper-change', function () {
 function changeTheme(theme) {
   if (!theme) return;
   document.documentElement.setAttribute('data-theme', theme);
-  try { localStorage.setItem('vocab-theme', theme); } catch (e) {}
+  try { window.vocabLocalStorage.setItem('vocab-theme', theme); } catch (e) {}
   applyThemeWallpaper();
   toggleWallpaperGroup();
   VOCAB_API.post('/api/settings/', { theme: theme }).then(function (res) {
@@ -977,8 +985,8 @@ function initVoiceButtons() {
   var currentVoice = '{% if settings.voice_type %}{{ settings.voice_type }}{% else %}us{% endif %}';
   // 同步给 TTS 引擎（tts.js 从 localStorage 读取）
   try {
-    localStorage.setItem('vocab-voice', currentVoice);
-    localStorage.setItem('vocab-rate', String({{ settings.speech_rate|default:1.0 }}));
+    window.vocabLocalStorage.setItem('vocab-voice', currentVoice);
+    window.vocabLocalStorage.setItem('vocab-rate', String({{ settings.speech_rate|default:1.0 }}));
   } catch (e) {}
   document.querySelectorAll('.voice-btn').forEach(function (btn) {
     btn.className = 'btn btn-secondary voice-btn';
@@ -1005,8 +1013,8 @@ async function savePronunciationSettings() {
 
   // 本地立即生效，供 tts.js 读取
   try {
-    localStorage.setItem('vocab-voice', voice);
-    localStorage.setItem('vocab-rate', String(speechRate));
+    window.vocabLocalStorage.setItem('vocab-voice', voice);
+    window.vocabLocalStorage.setItem('vocab-rate', String(speechRate));
   } catch (e) {}
 
   try {
@@ -1294,15 +1302,16 @@ function renderModelList() {
       '<div class="flex justify-between items-center">' +
         '<div style="min-width: 0;">' +
           '<strong>' + escapeHtml(m.display_name || m.model_id) + '</strong> ' + visionTag(m) +
-          '<div class="text-sm text-secondary" style="margin-top: 2px;">' + escapeHtml(p.name) + ' · ' + escapeHtml(m.model_id) + ' · ' + (m.has_key ? '密钥已保存' : '未设置密钥') + ' · ' + escapeHtml(m.context || '128K') + '</div>' +
+          '<div class="text-sm text-secondary" style="margin-top: 2px;">' + (m.is_public ? '站点公共模型' : escapeHtml(p.name) + ' · ' + (m.has_key ? '密钥已保存' : '未设置密钥')) + ' · ' + escapeHtml(m.model_id) + ' · ' + escapeHtml(m.context || '128K') + '</div>' +
         '</div>' +
         '<div class="flex items-center gap-2">' +
           modelHealthSpan(m) +
           '<span class="text-sm" style="color: ' + (m.enabled ? 'var(--c-green)' : 'var(--c-text-3)') + ';">' + (m.enabled ? '已启用' : '已禁用') + '</span>' +
-          '<label class="switch"><input type="checkbox" ' + (m.enabled ? 'checked' : '') + ' onchange="toggleAIModel(' + m.id + ')"><span class="slider"></span></label>' +
-          '<button class="btn btn-sm btn-secondary" id="testModelBtn' + m.id + '" onclick="testSavedModel(' + m.id + ')" title="测试该模型的 API 连接"><i class="ph ph-plugs-connected"></i></button>' +
-          '<button class="btn btn-sm btn-secondary" onclick="editAIModel(' + m.id + ')" title="编辑模型"><i class="ph ph-pencil-simple"></i></button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteAIModel(' + m.id + ')" title="删除模型"><i class="ph ph-trash"></i></button>' +
+          (m.is_public ? '' :
+            '<label class="switch"><input type="checkbox" ' + (m.enabled ? 'checked' : '') + ' onchange="toggleAIModel(' + m.id + ')"><span class="slider"></span></label>' +
+            '<button class="btn btn-sm btn-secondary" id="testModelBtn' + m.id + '" onclick="testSavedModel(' + m.id + ')" title="测试该模型的 API 连接"><i class="ph ph-plugs-connected"></i></button>' +
+            '<button class="btn btn-sm btn-secondary" onclick="editAIModel(' + m.id + ')" title="编辑模型"><i class="ph ph-pencil-simple"></i></button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteAIModel(' + m.id + ')" title="删除模型"><i class="ph ph-trash"></i></button>') +
         '</div>' +
       '</div>' +
       '<div id="testModelStatus' + m.id + '" class="text-sm" style="margin-top: 6px; display: none;"></div>' +

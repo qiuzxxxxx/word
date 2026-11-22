@@ -1,7 +1,7 @@
 // ===== Font Size =====
 function initFontSize() {
   var size = 'medium';
-  try { size = localStorage.getItem('vocab-font-size') || size; } catch (e) {}
+  try { size = window.vocabLocalStorage.getItem('vocab-font-size') || size; } catch (e) {}
   document.documentElement.setAttribute('data-font-size', size);
 }
 
@@ -171,6 +171,9 @@ function showToast(message, type, duration) {
 // ===== API Helper =====
 var VOCAB_API = {
   parseResponse: async function (response) {
+    if (response.status === 401 && window.vocabWebAccounts) {
+      window.location.replace('/login/?next=' + encodeURIComponent(location.pathname + location.search));
+    }
     var data;
     try {
       data = await response.json();
@@ -241,7 +244,7 @@ window.VocabStudyTimer = (function () {
   var TAB_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2);
   var LOCK_KEY = 'vocab_study_timer_master';
   var channel = null;
-  try { channel = new BroadcastChannel('vocab_study_timer'); } catch (e) {}
+  try { channel = new BroadcastChannel(window.vocabStorageKey('vocab_study_timer')); } catch (e) {}
 
   function pageIsActive() {
     return !document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus());
@@ -249,7 +252,7 @@ window.VocabStudyTimer = (function () {
 
   function ownsLock() {
     try {
-      var current = localStorage.getItem(LOCK_KEY) || '';
+      var current = window.vocabLocalStorage.getItem(LOCK_KEY) || '';
       return current.indexOf(TAB_ID + '|') === 0;
     } catch (e) { return false; }
   }
@@ -259,11 +262,11 @@ window.VocabStudyTimer = (function () {
     if (isMaster && ownsLock()) return true;
     isMaster = false;
     try {
-      var current = localStorage.getItem(LOCK_KEY);
+      var current = window.vocabLocalStorage.getItem(LOCK_KEY);
       var timestamp = current ? parseInt(current.split('|')[1], 10) : NaN;
       // Renewals run every 20 seconds; allow a 60-second lease for throttling.
       if (current && Number.isFinite(timestamp) && Date.now() - timestamp < 60000) return false;
-      localStorage.setItem(LOCK_KEY, TAB_ID + '|' + Date.now());
+      window.vocabLocalStorage.setItem(LOCK_KEY, TAB_ID + '|' + Date.now());
       if (ownsLock()) {
         isMaster = true;
         if (channel) channel.postMessage({ type: 'master_changed', tab: TAB_ID });
@@ -281,7 +284,7 @@ window.VocabStudyTimer = (function () {
       lastActiveAt = 0;
       return false;
     }
-    try { localStorage.setItem(LOCK_KEY, TAB_ID + '|' + Date.now()); }
+    try { window.vocabLocalStorage.setItem(LOCK_KEY, TAB_ID + '|' + Date.now()); }
     catch (e) { return false; }
     return true;
   }
@@ -291,7 +294,7 @@ window.VocabStudyTimer = (function () {
     var released = false;
     try {
       if (ownsLock()) {
-        localStorage.removeItem(LOCK_KEY);
+        window.vocabLocalStorage.removeItem(LOCK_KEY);
         released = true;
       }
     } catch (e) {}

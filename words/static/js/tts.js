@@ -7,11 +7,11 @@
 
   // 用户发音偏好（与设置页同步写入 localStorage），默认美音
   function getVoiceType() {
-    return localStorage.getItem('vocab-voice') === 'uk' ? 'uk' : 'us';
+    return window.vocabLocalStorage.getItem('vocab-voice') === 'uk' ? 'uk' : 'us';
   }
   // 用户自定语速（例句使用），默认 1.0
   function getUserRate() {
-    var r = parseFloat(localStorage.getItem('vocab-rate'));
+    var r = parseFloat(window.vocabLocalStorage.getItem('vocab-rate'));
     return (!isNaN(r) && r > 0) ? r : 1.0;
   }
 

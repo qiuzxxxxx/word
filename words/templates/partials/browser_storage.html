@@ -1,0 +1,16 @@
+<script>
+(function () {
+  window.vocabWebAccounts = {% if server_mode %}true{% else %}false{% endif %};
+  var prefix = '{% if server_mode %}lexizx:{{ request.user.pk|escapejs }}:{% endif %}';
+  window.vocabStorageKey = function (key) { return prefix + key; };
+  function scopedStorage(name) {
+    return {
+      getItem: function (key) { return window[name].getItem(prefix + key); },
+      setItem: function (key, value) { window[name].setItem(prefix + key, value); },
+      removeItem: function (key) { window[name].removeItem(prefix + key); }
+    };
+  }
+  window.vocabLocalStorage = scopedStorage('localStorage');
+  window.vocabSessionStorage = scopedStorage('sessionStorage');
+})();
+</script>

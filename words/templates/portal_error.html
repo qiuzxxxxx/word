@@ -1,0 +1,11 @@
+{% extends 'portal_shell.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block portal_class %}portal-auth{% endblock %}
+{% block portal %}
+<section class="portal-panel portal-auth-panel portal-status-page">
+  <span class="portal-section-icon"><i class="ph ph-warning-circle" aria-hidden="true"></i></span>
+  <h1>{{ title }}</h1>
+  <p>{{ detail }}</p>
+  <a class="btn btn-secondary" href="{% url 'words:dashboard' %}"><i class="ph ph-arrow-left" aria-hidden="true"></i> 返回学习首页</a>
+</section>
+{% endblock %}

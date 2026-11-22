@@ -1,16 +1,14 @@
-"""Windows DPAPI encryption for secrets persisted by the desktop application.
-
-The encrypted value can only be decrypted by the same Windows user on the
-same computer.  This is intentionally a desktop-only facility: the web
-application is never supported as a network service.
-"""
+"""Encrypt secrets using Windows DPAPI or the deployment's Fernet key."""
 
 import base64
 import ctypes
 from ctypes import wintypes
 
+from django.conf import settings
+
 
 _PREFIX = 'dpapi:v1:'
+_SERVER_PREFIX = 'fernet:v1:'
 
 
 class VaultError(RuntimeError):
@@ -43,9 +41,12 @@ def _require_windows():
 
 
 def encrypt(plaintext):
-    """Return a versioned DPAPI envelope for ``plaintext``."""
-    _require_windows()
+    """Return a versioned envelope for ``plaintext``."""
     raw = (plaintext or '').encode('utf-8')
+    if getattr(settings, 'SERVER_MODE', False):
+        return _SERVER_PREFIX + settings.SERVER_VAULT.encrypt(raw).decode('ascii')
+
+    _require_windows()
     source, _source_buffer = _blob(raw)
     protected = _DataBlob()
     crypt32 = ctypes.windll.crypt32
@@ -65,6 +66,17 @@ def encrypt(plaintext):
 
 def decrypt(envelope):
     """Decrypt a value produced by :func:`encrypt`."""
+    if getattr(settings, 'SERVER_MODE', False):
+        from cryptography.fernet import InvalidToken
+
+        if not isinstance(envelope, str) or not envelope.startswith(_SERVER_PREFIX):
+            raise VaultError('请在服务器的 AI 模型设置中重新录入密钥')
+        try:
+            token = envelope[len(_SERVER_PREFIX):].encode('ascii')
+            return settings.SERVER_VAULT.decrypt(token).decode('utf-8')
+        except (InvalidToken, UnicodeError) as exc:
+            raise VaultError('无法解密已保存的服务器 AI 密钥') from exc
+
     _require_windows()
     if not isinstance(envelope, str) or not envelope.startswith(_PREFIX):
         raise VaultError('invalid encrypted API key format')

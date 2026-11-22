@@ -1081,6 +1081,23 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .markdown-body strong { color: var(--c-red); font-weight: 700; }
 .markdown-body em { font-style: italic; color: var(--c-text-2); }
 
+.site-announcement { margin-bottom: 1rem; overflow-wrap: anywhere; }
+.site-announcement h2 { margin-bottom: .375rem; font-size: 1rem; }
+.site-announcement h2 .ph { color: var(--c-red-deep); }
+.announcement-content { min-width: 0; overflow-wrap: anywhere; }
+.announcement-content a { color: var(--c-red-deep); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.announcement-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.announcement-content :is(th, td) { padding: .4rem .6rem; border: 1px solid var(--c-border); }
+.announcement-content th { background: var(--c-surface-2); }
+.announcement-content > :first-child { margin-top: 0; }
+.announcement-content > :last-child { margin-bottom: 0; }
+.site-record { margin-inline: auto; padding: .5rem 1rem max(.5rem, env(safe-area-inset-bottom, 0px)); text-align: center; font-size: .8125rem; }
+.site-record a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-text-2); text-decoration: none; }
+.site-record a:hover { text-decoration: underline; text-underline-offset: .2em; }
+.site-record a:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+.main-content--web { display: flex; flex-direction: column; }
+.main-content--web > .site-record { margin-top: auto; }
+
 /* Markdown 表格样式 */
 .md-table-wrap { margin: 14px 0; overflow-x: auto; border: 1px solid var(--c-border-light); border-radius: var(--radius-sm); background: var(--c-surface); }
 .md-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }

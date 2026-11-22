@@ -1,0 +1,6 @@
+Django>=5.2.19,<5.3
+reportlab>=4.0,<6.0
+cryptography>=42.0
+gunicorn>=25,<27
+PyJWT>=2.13,<3
+mistune>=3.4,<4

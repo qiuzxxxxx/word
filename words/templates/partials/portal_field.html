@@ -1,0 +1,12 @@
+<div class="portal-field{% if field.errors %} portal-field--error{% endif %}">
+  {% if field.field.widget.input_type == 'checkbox' %}
+    <label class="portal-switch">
+      {{ field }}<span class="portal-switch-track" aria-hidden="true"></span><span>{{ field.label }}</span>
+    </label>
+  {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+  {% endif %}
+  {% if field.help_text %}<div class="portal-help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+  {{ field.errors }}
+</div>

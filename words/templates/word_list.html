@@ -386,12 +386,12 @@
       sort: document.getElementById('sortFilter').value,
       page: currentPage
     };
-    sessionStorage.setItem('vocab-wordlist', JSON.stringify(state));
+    window.vocabSessionStorage.setItem('vocab-wordlist', JSON.stringify(state));
   }
 
   function restoreWordListState() {
     try {
-      var s = JSON.parse(sessionStorage.getItem('vocab-wordlist') || 'null');
+      var s = JSON.parse(window.vocabSessionStorage.getItem('vocab-wordlist') || 'null');
       if (!s) return;
       if (s.search) document.getElementById('searchInput').value = s.search;
       if (s.category) document.getElementById('categoryFilter').value = s.category;
@@ -595,7 +595,7 @@
     });
     select.onchange = function () {
       perPage = parseInt(this.value);
-      try { localStorage.setItem('vocab-pp', perPage); } catch (e) {}
+      try { window.vocabLocalStorage.setItem('vocab-pp', perPage); } catch (e) {}
       loadWords(1);
     };
     container.appendChild(select);
@@ -705,12 +705,12 @@
       document.getElementById('wmWord').value = '';
       // 从已加载的数据中查找，找不到则请求详情
       var row = null;
-      try { row = JSON.parse(sessionStorage.getItem('vocab-edit-' + wordId) || 'null'); } catch (e) {}
+      try { row = JSON.parse(window.vocabSessionStorage.getItem('vocab-edit-' + wordId) || 'null'); } catch (e) {}
       fillWordModal(row || {});
       if (!row) {
         VOCAB_API.get('/api/words/' + wordId + '/').then(function (d) {
           fillWordModal(d);
-          sessionStorage.setItem('vocab-edit-' + wordId, JSON.stringify(d));
+          window.vocabSessionStorage.setItem('vocab-edit-' + wordId, JSON.stringify(d));
         }).catch(function () { showToast('加载单词详情失败', 'error'); });
       }
     } else {
@@ -1037,7 +1037,7 @@
       var res = await VOCAB_API.post(url, data);
       if (res.success) {
         showToast(id ? '单词已更新' : '添加成功', 'success');
-        if (id) sessionStorage.removeItem('vocab-edit-' + id);
+        if (id) window.vocabSessionStorage.removeItem('vocab-edit-' + id);
         closeWordModal();
         loadWords(currentPage);
         loadUnits();
@@ -1140,7 +1140,7 @@
 
   // Initial load: restore perPage & filter state, then fetch fresh data
   var savedPP = NaN;
-  try { savedPP = parseInt(localStorage.getItem('vocab-pp')); } catch (e) {}
+  try { savedPP = parseInt(window.vocabLocalStorage.getItem('vocab-pp')); } catch (e) {}
   if (savedPP && [20, 50, 100].indexOf(savedPP) !== -1) { perPage = savedPP; }
   restoreWordListState();
   loadWords(currentPage);

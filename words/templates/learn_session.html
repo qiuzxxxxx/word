@@ -180,7 +180,7 @@
   var practiceWrongIds = []; // 本轮自测标记「不会」的词（用于「再练错词」）
 
   // Restore index from sessionStorage (survives page refresh)；自测模式不恢复也不写入
-  var savedIndex = practiceOnly ? null : sessionStorage.getItem('vocab-learn-idx');
+  var savedIndex = practiceOnly ? null : window.vocabSessionStorage.getItem('vocab-learn-idx');
   var currentIndex = (savedIndex !== null) ? parseInt(savedIndex) : 0;
   var currentWord = null;
   var revealDone = false; // 是否已显示释义
@@ -201,14 +201,14 @@
   var gateBaseTotal = wordCount;    // 高效模式进度基于原始单词数，不随穿插副本增加
   var gateBaseIds = {};             // 原始单词 ID 集合，用于过滤旧会话残留状态
   if (!practiceOnly) try {
-    (JSON.parse(sessionStorage.getItem('vocab-learn-gate-ids') || '[]') || []).forEach(function (id) { gateDoneIds[id] = true; });
+    (JSON.parse(window.vocabSessionStorage.getItem('vocab-learn-gate-ids') || '[]') || []).forEach(function (id) { gateDoneIds[id] = true; });
   } catch (e) {}
   var gateAutoShow = {{ gate_answer_show|yesno:'true,false' }}; // 答错后直接显示答案；否则先自己重试，连错 3 次才显示答案
 
   var counts = { mastered: 0, unknown: 0 };
   // Restore counts so refresh keeps 会/不会统计；自测模式始终从零开始
   if (!practiceOnly) try {
-    var savedCounts = JSON.parse(sessionStorage.getItem('vocab-learn-counts') || 'null');
+    var savedCounts = JSON.parse(window.vocabSessionStorage.getItem('vocab-learn-counts') || 'null');
     if (savedCounts) {
       counts.mastered = savedCounts.mastered || 0;
       counts.unknown = savedCounts.unknown || 0;
@@ -219,7 +219,7 @@
   var RESUME_KEY = 'vocab-learn-resume';
   var resumeSnap = null;
   if (!practiceOnly && /[?&]resume=1/.test(location.search)) {
-    try { resumeSnap = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); } catch (e) { resumeSnap = null; }
+    try { resumeSnap = JSON.parse(window.vocabLocalStorage.getItem(RESUME_KEY) || 'null'); } catch (e) { resumeSnap = null; }
   }
   if (resumeSnap && Array.isArray(resumeSnap.words) && resumeSnap.words.length) {
     wordsData = resumeSnap.words;
@@ -236,10 +236,10 @@
     }
     (resumeSnap.gateDoneIds || []).forEach(function (id) { gateDoneIds[id] = true; });
     // 同步回 sessionStorage，保证续背后页内刷新不丢
-    sessionStorage.setItem('vocab-learn-idx', String(currentIndex));
-    sessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
+    window.vocabSessionStorage.setItem('vocab-learn-idx', String(currentIndex));
+    window.vocabSessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
     persistResume();
-    sessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
+    window.vocabSessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
         persistResume();
   }
 
@@ -261,7 +261,7 @@
     Object.keys(gateDoneIds).forEach(function (id) {
       if (gateBaseIds[id] === undefined) delete gateDoneIds[id];
     });
-    if (!practiceOnly) sessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
+    if (!practiceOnly) window.vocabSessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
   })();
 
   var els = {
@@ -288,7 +288,7 @@
 
   function saveProgress() {
     if (practiceOnly) return; // 自测模式不留任何断点
-    sessionStorage.setItem('vocab-learn-idx', currentIndex);
+    window.vocabSessionStorage.setItem('vocab-learn-idx', currentIndex);
     persistResume();
   }
 
@@ -296,8 +296,8 @@
   function persistResume() {
     if (practiceOnly) return; // 自测模式不覆盖正式背诵的断点
     try {
-      if (wordCount === 0 || wordCount > 800 || wordCount === undefined) { localStorage.removeItem(RESUME_KEY); return; }
-      localStorage.setItem(RESUME_KEY, JSON.stringify({
+      if (wordCount === 0 || wordCount > 800 || wordCount === undefined) { window.vocabLocalStorage.removeItem(RESUME_KEY); return; }
+      window.vocabLocalStorage.setItem(RESUME_KEY, JSON.stringify({
         v: 1,
         ts: Date.now(),
         mode: mode,
@@ -772,7 +772,7 @@
       return;
     }
     counts[action] = (counts[action] || 0) + 1;
-    sessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
+    window.vocabSessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
     persistResume();
 
     VOCAB_API.post('/api/mark/' + action + '/' + currentWord.id + '/', { source: 'learn', mode: checkMode })
@@ -873,7 +873,7 @@
         // 待复核不判对也不判错：不计入会/不会，避免污染本次学习统计
         var ok = checkMode === 'spelling' ? res.correct : (res.verdict === 'correct' || res.verdict === 'partial');
         counts[ok ? 'mastered' : 'unknown'] = (counts[ok ? 'mastered' : 'unknown'] || 0) + 1;
-        sessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
+        window.vocabSessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
       }
     persistResume();
       renderCheckResult(res);
@@ -949,7 +949,7 @@
         gateFlipped[pid] = true;
         counts.mastered = Math.max(0, (counts.mastered || 0) - 1);
         counts.unknown = (counts.unknown || 0) + 1;
-        sessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
+        window.vocabSessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
     persistResume();
         flipNote = '<div>（穿插出现有答错，本词改记「不会」）</div>';
       }
@@ -958,7 +958,7 @@
         els.checkResult.innerHTML = '<div class="check-result-title">穿插重现 ' + k + '/' + gateInterleaveTotal + ' 通过 ✓ 稍后还会再出现</div>' + flipNote;
       } else {
         gateDoneIds[pid] = true;
-        sessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
+        window.vocabSessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
         persistResume();
         els.checkResult.className = 'check-result result-correct';
         els.checkResult.innerHTML = '<div class="check-result-title">本词全部完成：连续 ' + gateRepeatTotal + ' 遍 + ' + gateInterleaveTotal + ' 次穿插 ✓' + ((gateAnyWrong[pid] || gateFlipped[pid]) ? '（最终记入「不会」）' : '') + '</div>';
@@ -987,7 +987,7 @@
     var verdict = gateAnyWrong[pid] ? 'unknown' : 'mastered';
     gateCountedAs[pid] = verdict;
     counts[verdict] = (counts[verdict] || 0) + 1;
-    sessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
+    window.vocabSessionStorage.setItem('vocab-learn-counts', JSON.stringify(counts));
     persistResume();
     var gateNextBtn2 = document.getElementById('nextBtn');
     if (gateNextBtn2) gateNextBtn2.disabled = false;
@@ -997,7 +997,7 @@
       els.checkResult.innerHTML = '<div class="check-result-title">连续 ' + gateRepeatTotal + ' 遍完成 ✓ 该词稍后将随机穿插重现 ' + gateInterleaveTotal + ' 次' + (gateAnyWrong[pid] ? '（本词记入「不会」）' : '') + '</div>';
     } else {
       gateDoneIds[pid] = true;
-      sessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
+      window.vocabSessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
         persistResume();
       if (res && gateAllCorrect) {
         renderCheckResult(res);
@@ -1073,7 +1073,7 @@
       var pidP = currentWord.id;
       gateCountedAs[pidP] = 'pending';
       gateDoneIds[pidP] = true;
-      sessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
+      window.vocabSessionStorage.setItem('vocab-learn-gate-ids', JSON.stringify(Object.keys(gateDoneIds)));
       passedThisAppearance = true;
       checked = true;
       setMarkButtonsEnabled(false);
@@ -1159,11 +1159,11 @@
     }
     var msg = '本次共学习 ' + Object.keys(uniq).length + ' 个单词';
     els.completionMsg.textContent = msg;
-    sessionStorage.removeItem('vocab-learn-idx');
-    sessionStorage.removeItem('vocab-learn-counts');
-    sessionStorage.removeItem('vocab-learn-gate-pass');
-    sessionStorage.removeItem('vocab-learn-gate-ids');
-    try { localStorage.removeItem('vocab-learn-resume'); } catch (e) {} // 背完清除断点
+    window.vocabSessionStorage.removeItem('vocab-learn-idx');
+    window.vocabSessionStorage.removeItem('vocab-learn-counts');
+    window.vocabSessionStorage.removeItem('vocab-learn-gate-pass');
+    window.vocabSessionStorage.removeItem('vocab-learn-gate-ids');
+    try { window.vocabLocalStorage.removeItem('vocab-learn-resume'); } catch (e) {} // 背完清除断点
   }
 
   // 自测模式：只重练本轮标记「不会」的词（纯前端重置，词已在启动时经服务端校验）

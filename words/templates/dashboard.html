@@ -514,14 +514,14 @@
     try {
       var d = new Date();
       var key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-      localStorage.setItem('vocab-daily-quote-closed', key);
+      window.vocabLocalStorage.setItem('vocab-daily-quote-closed', key);
     } catch (e) {}
   }
   (function () {
     try {
       var d = new Date();
       var key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-      if (localStorage.getItem('vocab-daily-quote-closed') === key) {
+      if (window.vocabLocalStorage.getItem('vocab-daily-quote-closed') === key) {
         var q = document.getElementById('dailyQuote');
         if (q) q.hidden = true;
       }

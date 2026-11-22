@@ -1,14 +1,15 @@
-{% load static %}
+{% load static portal_content %}
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}学习工具{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=360">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=361">
   <!-- Phosphor 图标字体（随程序打包的本地静态资源，离线可用，不发起任何外网请求） -->
   <link rel="stylesheet" href="{% static 'vendor/phosphor/regular/style.css' %}?v=211">
   <link rel="stylesheet" href="{% static 'vendor/phosphor/fill/style.css' %}?v=211">
+  {% include 'partials/browser_storage.html' %}
   {% block extra_head %}{% endblock %}
   <script>
   /* 外链处理：打包成桌面应用时，外链在应用内新窗口打开，不跳出程序；
@@ -134,7 +135,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content{% if server_mode %} main-content--web{% endif %}">
       <div class="top-bar">
         <div class="top-bar-title">{% block page_title %}考研单词背诵系统{% endblock %}</div>
         <div class="top-bar-actions">
@@ -146,12 +147,26 @@
           <button id="themeToggle" class="btn btn-secondary btn-sm" onclick="toggleTheme()" title="切换主题">
             <i id="themeIcon" class="ph ph-moon"></i>
           </button>
+          {% if server_mode %}
+          {% if can_manage_site %}<a class="btn btn-secondary btn-sm" href="{% url 'site_control' %}">管理端</a>{% endif %}
+          <form method="post" action="{% url 'owner_logout' %}">
+            {% csrf_token %}
+            <button class="btn btn-secondary btn-sm" type="submit">退出登录</button>
+          </form>
+          {% endif %}
         </div>
       </div>
 
       <div class="page-content">
+        {% for announcement in site_announcements %}
+        <section class="card site-announcement">
+          <h2><i class="ph ph-megaphone" aria-hidden="true"></i> {{ announcement.title }}</h2>
+          <div class="markdown-body announcement-content">{{ announcement.body|announcement_html }}</div>
+        </section>
+        {% endfor %}
         {% block content %}{% endblock %}
       </div>
+      {% if server_mode %}{% include 'partials/site_record.html' %}{% endif %}
     </main>
   </div>
 
@@ -192,12 +207,13 @@
     </div>
   </div>
 
-  <script src="{% static 'js/tts.js' %}"></script>
-  <script src="{% static 'js/app.js' %}?v=335"></script>
+  <script src="{% static 'js/tts.js' %}?v=2"></script>
+  <script src="{% static 'js/app.js' %}?v=337"></script>
   <script src="{% static 'js/exam_shared.js' %}?v=347"></script>
   <script src="{% static 'js/ai_model_modal.js' %}?v=333"></script>
   {% block extra_scripts %}{% endblock %}
 
+  {% if not server_mode %}
   <script>
   // 上次自动更新结果提示（安装成功 / 已自动回滚），确认一次后不再重复
   (function () {
@@ -219,6 +235,7 @@
       .catch(function () {});
   })();
   </script>
+  {% endif %}
 
   <script>
   // 5 套主题 + 自定义壁纸模式循环切换
@@ -239,7 +256,7 @@
 
   // ===== 壁纸存储：IndexedDB（本地运行不限大小，支持多张） =====
   var WallpaperDB = (function () {
-    var DB_NAME = 'vocab-wallpaper-db';
+    var DB_NAME = window.vocabStorageKey('vocab-wallpaper-db');
     var STORE = 'wallpaper';
     var LIST_KEY = 'wallpaper-list';
     var LEGACY_KEY_INNER = 'custom-wallpaper';
@@ -356,11 +373,11 @@
 
   function _currentWallpaperId() {
     var id = null;
-    try { id = localStorage.getItem(WALLPAPER_KEY); } catch (e) {}
+    try { id = window.vocabLocalStorage.getItem(WALLPAPER_KEY); } catch (e) {}
     return id || null;
   }
   function _saveCurrentWallpaperId(id) {
-    try { localStorage.setItem(WALLPAPER_KEY, id || ''); } catch (e) {}
+    try { window.vocabLocalStorage.setItem(WALLPAPER_KEY, id || ''); } catch (e) {}
   }
 
   // 从列表应用当前选中的壁纸（供页面和设置页共用）
@@ -448,7 +465,7 @@
       var f = blob && blob !== file ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
       return WallpaperDB.add(f);
     }).then(function (item) {
-      try { localStorage.removeItem(LEGACY_KEY); } catch (e) {}
+      try { window.vocabLocalStorage.removeItem(LEGACY_KEY); } catch (e) {}
       _saveCurrentWallpaperId(item.id);
       _setWallpaperBg(URL.createObjectURL(item.blob));
       var layer = document.getElementById('themeWallpaper');
@@ -519,7 +536,7 @@
   // Theme init — restore from localStorage
   (function() {
     var saved = null;
-    try { saved = localStorage.getItem('vocab-theme'); } catch (e) {}
+    try { saved = window.vocabLocalStorage.getItem('vocab-theme'); } catch (e) {}
     if (THEMES.indexOf(saved) === -1) saved = 'light';
     document.documentElement.setAttribute('data-theme', saved);
     document.getElementById('themeIcon').className = 'ph ' + THEME_ICONS[saved];
@@ -533,7 +550,7 @@
     if (idx === -1) idx = 0;
     var next = THEMES[(idx + 1) % THEMES.length];
     html.setAttribute('data-theme', next);
-    try { localStorage.setItem('vocab-theme', next); } catch (e) {}
+    try { window.vocabLocalStorage.setItem('vocab-theme', next); } catch (e) {}
     document.getElementById('themeIcon').className = 'ph ' + THEME_ICONS[next];
     applyThemeWallpaper();
     window.dispatchEvent(new CustomEvent('vocab-theme-change', { detail: { theme: next } }));

@@ -1,0 +1,42 @@
+{% extends 'portal_shell.html' %}
+{% block title %}邮箱注册{% endblock %}
+{% block portal_class %}portal-auth{% endblock %}
+{% block portal %}
+<section class="portal-panel portal-auth-panel" aria-labelledby="register-title">
+  <h1 id="register-title">邮箱注册</h1>
+  {% if unavailable %}
+    <p class="portal-notice" role="status">邮箱注册暂未开放。</p>
+  {% else %}
+    {% if notice %}<p class="portal-notice" role="status">{{ notice }}</p>{% endif %}
+    <form class="portal-form" method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.privacy_version }}
+      {{ form.privacy_version.errors }}
+      <div class="portal-email-row">
+        {% include 'partials/portal_field.html' with field=form.email %}
+        <button class="btn btn-secondary" type="submit" name="action" value="send" formnovalidate>发送验证码</button>
+      </div>
+      {% include 'partials/portal_field.html' with field=form.code %}
+      {% include 'partials/portal_field.html' with field=form.username %}
+      <div class="registration-passwords">
+        {% include 'partials/portal_field.html' with field=form.password %}
+        {% include 'partials/portal_field.html' with field=form.password_confirm %}
+      </div>
+      <div class="registration-consent">
+        <details class="registration-declaration">
+          <summary class="btn btn-secondary"><i class="ph ph-file-text" aria-hidden="true"></i> 查看用户声明</summary>
+          <div class="registration-declaration-body">
+            {% include 'partials/privacy_statement.html' %}
+          </div>
+        </details>
+        {% include 'partials/portal_field.html' with field=form.agree_privacy %}
+      </div>
+      <button class="btn btn-primary portal-submit" type="submit" name="action" value="register">创建账号 <i class="ph ph-arrow-right" aria-hidden="true"></i></button>
+    </form>
+  {% endif %}
+  <div class="portal-auth-actions">
+    <span>已有账号？</span><a class="btn btn-secondary" href="{% url 'owner_login' %}">返回登录</a>
+  </div>
+</section>
+{% endblock %}

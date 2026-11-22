@@ -18,10 +18,13 @@ AI 功能需要联网并自行配置模型 API，可能产生服务费用；AI �
 
 ```powershell
 pip install -r requirements.txt
-python manage.py migrate
 python manage.py runserver
 ```
 
-访问 `http://127.0.0.1:8000/`。打包产物由 `product/` 目录下的脚本生成。
+访问 `http://127.0.0.1:8000/`。默认启动与宝塔部署共用页面和功能的多用户网页版，首次运行自动初始化 `dist/local-web/` 下的独立数据库。在未登录的窗口打开 `/register/`，测试验证码会输出到运行终端，完整邮件保存在 `dist/local-web/mail/`。
 
-</details>
+本地测试管理员为 `zx`，初始密码 `Local-preview-zx-2026!`。普通测试账号为 `demo`，初始密码 `Local-preview-demo-2026!`。这些账号仅用于本机测试。
+
+调试 Windows 桌面模式时使用 `python manage.py runserver --settings=vocab_project.settings`。桌面打包由 `product/` 目录下的脚本生成。
+
+

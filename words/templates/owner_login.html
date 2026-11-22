@@ -1,0 +1,26 @@
+{% extends 'portal_shell.html' %}
+{% block title %}登录{% endblock %}
+{% block portal_class %}portal-auth{% endblock %}
+{% block portal %}
+<section class="portal-panel portal-auth-panel" aria-labelledby="login-title">
+  <h1 id="login-title">登录学习工具</h1>
+  {% if site_state.maintenance %}<p class="portal-notice"><i class="ph ph-wrench" aria-hidden="true"></i>{{ site_state.message|default:'网站正在维护，普通账号暂时无法登录。' }}</p>{% endif %}
+  <form class="portal-form" method="post" action="{% url 'owner_login' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% if form.non_field_errors %}<div class="portal-notice portal-notice--error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="portal-field{% if form.username.errors %} portal-field--error{% endif %}">
+      <label for="{{ form.username.id_for_label }}">用户名或邮箱</label>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </div>
+    {% include 'partials/portal_field.html' with field=form.password %}
+    <button class="btn btn-primary portal-submit" type="submit">登录 <i class="ph ph-arrow-right" aria-hidden="true"></i></button>
+  </form>
+  {% if signup_available and not site_state.maintenance %}
+  <div class="portal-auth-actions">
+    <span>还没有账号？</span><a class="btn btn-secondary" href="{% url 'register' %}">邮箱注册</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

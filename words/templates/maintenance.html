@@ -1,0 +1,11 @@
+{% extends 'portal_shell.html' %}
+{% block title %}网站维护{% endblock %}
+{% block portal_class %}portal-auth{% endblock %}
+{% block portal %}
+<section class="portal-panel portal-auth-panel portal-status-page">
+  <span class="portal-section-icon"><i class="ph ph-wrench" aria-hidden="true"></i></span>
+  <h1>网站正在维护</h1>
+  <p>{{ site.message|default:'请稍后再试。' }}</p>
+  <a class="btn btn-secondary" href="{% url 'owner_login' %}"><i class="ph ph-arrow-left" aria-hidden="true"></i> 返回登录</a>
+</section>
+{% endblock %}

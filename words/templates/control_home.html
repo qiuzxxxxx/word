@@ -1,0 +1,132 @@
+{% extends 'portal_shell.html' %}
+{% load portal_content %}
+{% block title %}站点管理{% endblock %}
+{% block portal_nav %}
+  <div class="portal-actions">
+    <a class="btn btn-secondary" href="{% url 'words:dashboard' %}"><i class="ph ph-house" aria-hidden="true"></i> 学习首页</a>
+    <form method="post" action="{% url 'owner_logout' %}">
+      {% csrf_token %}<button class="btn btn-secondary" type="submit"><i class="ph ph-sign-out" aria-hidden="true"></i> 退出登录</button>
+    </form>
+  </div>
+{% endblock %}
+{% block portal %}
+<header class="control-heading">
+  <h1>站点管理</h1>
+  <nav class="control-jump" aria-label="管理栏目">
+    <a href="#users">用户</a><a href="#public-models">公共 AI</a><a href="#announcements">公告</a>
+  </nav>
+</header>
+
+<section class="portal-panel control-status" aria-labelledby="site-status-title">
+  <div class="control-status-main">
+    <span class="portal-section-icon"><i class="ph {% if site.maintenance %}ph-wrench{% else %}ph-pulse{% endif %}" aria-hidden="true"></i></span>
+    <div>
+      <div class="control-title-line">
+        <h2 id="site-status-title">网站状态</h2>
+        {% if site.maintenance %}<span class="portal-pill portal-pill--warn">维护中</span>
+        {% else %}<span class="portal-pill portal-pill--good">正常开放</span>{% endif %}
+      </div>
+      {% if site.maintenance and site.message %}<p class="portal-muted">{{ site.message }}</p>{% endif %}
+    </div>
+  </div>
+  <a class="btn btn-secondary" href="{% url 'control_new' 'site' %}"><i class="ph ph-gear-six" aria-hidden="true"></i> 设置维护</a>
+</section>
+
+<section class="portal-panel control-panel" id="users" aria-labelledby="users-title">
+  <header class="control-panel-header">
+    <div class="control-title-line"><h2 id="users-title">用户账号</h2><span class="portal-count">{{ accounts.paginator.count }} 位</span></div>
+    <a class="btn btn-primary" href="{% url 'control_new' 'users' %}"><i class="ph ph-user-plus" aria-hidden="true"></i> 创建用户</a>
+  </header>
+  <form method="get" action="{% url 'site_control' %}#users" class="control-search">
+    <div class="control-search-field">
+      <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+      <input class="form-input" type="search" name="q" value="{{ query }}" maxlength="150" placeholder="用户名或邮箱" aria-label="用户名或邮箱">
+    </div>
+    <button class="btn btn-secondary" type="submit">搜索</button>
+    {% if query %}<a class="btn btn-secondary" href="{% url 'site_control' %}#users">清除</a>{% endif %}
+  </form>
+  <ul class="control-list">
+    {% for account in accounts %}
+    <li class="control-row">
+      <div class="control-row-body">
+        <div class="control-title-line">
+          <strong>{{ account.user.username }}</strong>
+          {% if account.user.is_active %}<span class="portal-pill portal-pill--good">正常</span>
+          {% else %}<span class="portal-pill portal-pill--warn">已封禁</span>{% endif %}
+        </div>
+        {% if account.email %}<p class="portal-muted">{{ account.email }}</p>{% endif %}
+      </div>
+      <div class="portal-actions">
+        <a class="btn btn-secondary" href="{% url 'control_edit' 'users' account.pk %}"><i class="ph ph-pencil-simple" aria-hidden="true"></i> 编辑 / 重置密码</a>
+        <form class="portal-actions" method="post" action="{% url 'control_action' 'users' account.pk %}">
+          {% csrf_token %}
+          {% if account.user.is_active %}<button class="btn btn-secondary" name="operation" value="ban" data-confirm="封禁后，该账号会立即退出登录。确定封禁？">封禁</button>
+          {% else %}<button class="btn btn-secondary" name="operation" value="unban">解封</button>{% endif %}
+          <button class="btn portal-danger" name="operation" value="delete" data-confirm="删除后该账号将无法登录，已有学习数据会留存。确定删除？">删除</button>
+        </form>
+      </div>
+    </li>
+    {% empty %}<li class="control-empty"><i class="ph ph-users" aria-hidden="true"></i>{% if query %}没有符合条件的用户。{% else %}还没有普通用户。{% endif %}</li>{% endfor %}
+  </ul>
+  {% if accounts.has_other_pages %}
+  <nav class="portal-actions control-pagination" aria-label="账号分页">
+    {% if accounts.has_previous %}<a class="btn btn-secondary" href="?q={{ query|urlencode }}&amp;page={{ accounts.previous_page_number }}#users">上一页</a>{% endif %}
+    <span class="portal-muted">第 {{ accounts.number }} 页 / 共 {{ accounts.paginator.num_pages }} 页</span>
+    {% if accounts.has_next %}<a class="btn btn-secondary" href="?q={{ query|urlencode }}&amp;page={{ accounts.next_page_number }}#users">下一页</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+
+<div class="control-columns">
+  <section class="portal-panel control-panel" id="public-models" aria-labelledby="models-title">
+    <header class="control-panel-header">
+      <h2 id="models-title">公共 AI 模型</h2>
+      <a class="btn btn-secondary" href="{% url 'control_new' 'model' %}"><i class="ph ph-plus" aria-hidden="true"></i> 添加模型</a>
+    </header>
+    <ul class="control-list">
+      {% for model in shared_models %}
+      <li class="control-row">
+        <div class="control-row-body">
+          <div class="control-title-line"><strong>{{ model.name }}</strong>
+          {% if model.enabled %}<span class="portal-pill portal-pill--good">开放</span>
+          {% else %}<span class="portal-pill">停用</span>{% endif %}</div>
+          <p class="portal-muted">{{ model.model_id }}</p>
+          <p class="portal-muted">每日每人 {{ model.per_user_daily }} 次 · 全站 {{ model.daily_total }} 次</p>
+        </div>
+        <div class="portal-actions">
+          <a class="btn btn-secondary" href="{% url 'control_edit' 'model' model.pk %}">编辑</a>
+          <form method="post" action="{% url 'control_action' 'model' model.pk %}">
+            {% csrf_token %}<button class="btn portal-danger" name="operation" value="delete" data-confirm="确定删除这个公共模型？">删除</button>
+          </form>
+        </div>
+      </li>
+      {% empty %}<li class="control-empty"><i class="ph ph-cpu" aria-hidden="true"></i>暂未配置公共模型。</li>{% endfor %}
+    </ul>
+  </section>
+
+  <section class="portal-panel control-panel" id="announcements" aria-labelledby="announcements-title">
+    <header class="control-panel-header">
+      <h2 id="announcements-title">公告</h2>
+      <a class="btn btn-secondary" href="{% url 'control_new' 'announcement' %}"><i class="ph ph-plus" aria-hidden="true"></i> 新建公告</a>
+    </header>
+    <ul class="control-list">
+      {% for announcement in announcements %}
+      <li class="control-row control-row--stacked">
+        <div class="control-row-body">
+          <div class="control-title-line"><strong>{{ announcement.title }}</strong>
+          {% if announcement.published %}<span class="portal-pill portal-pill--good">已发布</span>
+          {% else %}<span class="portal-pill">草稿</span>{% endif %}</div>
+          <div class="markdown-body announcement-content">{{ announcement.body|announcement_html }}</div>
+        </div>
+        <div class="portal-actions">
+          <a class="btn btn-secondary" href="{% url 'control_edit' 'announcement' announcement.pk %}">编辑</a>
+          <form method="post" action="{% url 'control_action' 'announcement' announcement.pk %}">
+            {% csrf_token %}<button class="btn portal-danger" name="operation" value="delete" data-confirm="确定删除这条公告？">删除</button>
+          </form>
+        </div>
+      </li>
+      {% empty %}<li class="control-empty"><i class="ph ph-megaphone" aria-hidden="true"></i>还没有公告。</li>{% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

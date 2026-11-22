@@ -149,9 +149,9 @@ async function confirmCandidate(cid) {
 async function editCandidate(cid) {
   const titleEl = document.getElementById('family-title-' + cid);
   const descEl = document.getElementById('family-desc-' + cid);
-  const newTitle = prompt('词族名称：', titleEl.textContent.trim());
+  const newTitle = await appPrompt('词族名称', titleEl.textContent.trim());
   if (newTitle === null) return;
-  const newDesc = prompt('中文说明：', descEl.textContent.trim());
+  const newDesc = await appPrompt('中文说明', descEl.textContent.trim());
   if (newDesc === null) return;
   const { ok, data } = await postAction(cid, {
     action: 'edit',
@@ -166,7 +166,7 @@ async function editCandidate(cid) {
 }
 
 async function rejectCandidate(cid) {
-  if (!confirm('确定拒绝并删除该候选批次？此操作不可恢复。')) return;
+  if (!await appConfirm('确定拒绝并删除该候选批次？此操作不可恢复。')) return;
   const { ok, data } = await postAction(cid, { action: 'reject' });
   if (ok && data.success) {
     showToast('已拒绝并删除', 'success');

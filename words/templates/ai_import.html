@@ -267,11 +267,11 @@
   // 一次性迁移旧版 localStorage 模型到数据库，迁移成功后清除 localStorage
   function migrateLegacyLocalModels() {
     var legacy = null;
-    try { legacy = JSON.parse(localStorage.getItem('vocab-ai-models') || '[]'); } catch (e) { legacy = []; }
+    try { legacy = JSON.parse(window.vocabLocalStorage.getItem('vocab-ai-models') || '[]'); } catch (e) { legacy = []; }
     if (!legacy || !legacy.length) return Promise.resolve();
     return VOCAB_API.get('/api/ai-models/').then(function (res) {
       if (res && res.models && res.models.length) {
-        try { localStorage.removeItem('vocab-ai-models'); } catch (e) {}
+        try { window.vocabLocalStorage.removeItem('vocab-ai-models'); } catch (e) {}
         return;
       }
       var ps = legacy.map(function (m) {
@@ -288,7 +288,7 @@
         }).catch(function () {});
       });
       return Promise.all(ps).then(function () {
-        try { localStorage.removeItem('vocab-ai-models'); } catch (e) {}
+        try { window.vocabLocalStorage.removeItem('vocab-ai-models'); } catch (e) {}
       });
     }).catch(function () {});
   }
@@ -306,7 +306,7 @@
 
   function saveAIDraft() {
     try {
-      localStorage.setItem(AI_DRAFT_KEY, JSON.stringify({
+      window.vocabLocalStorage.setItem(AI_DRAFT_KEY, JSON.stringify({
         aiWords: aiWords,
         aiReviewState: aiReviewState,
         aiReviewQueue: aiReviewQueue,
@@ -322,11 +322,11 @@
     } catch (e) { /* localStorage 不可用时忽略 */ }
   }
   function loadAIDraft() {
-    try { return JSON.parse(localStorage.getItem(AI_DRAFT_KEY) || 'null'); }
+    try { return JSON.parse(window.vocabLocalStorage.getItem(AI_DRAFT_KEY) || 'null'); }
     catch (e) { return null; }
   }
   function clearAIDraft() {
-    localStorage.removeItem(AI_DRAFT_KEY);
+    window.vocabLocalStorage.removeItem(AI_DRAFT_KEY);
   }
 
   function showAIDraftBar() {

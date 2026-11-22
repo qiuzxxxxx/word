@@ -683,7 +683,7 @@ function renderResult(res) {
 // ===== 重新考试 / 返回配置 =====
 function examRestart() {
   const cfg = examState.config;
-  localStorage.removeItem(EXAM_KEY);
+  window.vocabLocalStorage.removeItem(EXAM_KEY);
   // 恢复配置选项
   document.querySelector('input[name=examScope][value="' + cfg.scope + '"]').checked = true;
   document.querySelector('input[name=examCategory][value="' + cfg.category + '"]').checked = true;
@@ -700,7 +700,7 @@ function examRestart() {
   startExamFromConfig(cfg);
 }
 function examBackToConfig() {
-  localStorage.removeItem(EXAM_KEY);
+  window.vocabLocalStorage.removeItem(EXAM_KEY);
   examState = null;
   showPhase('config');
 }
@@ -729,11 +729,11 @@ function showPhase(name) {
 
 // ===== 持久化（刷新后恢复） =====
 function saveExamState() {
-  try { localStorage.setItem(EXAM_KEY, JSON.stringify(examState)); } catch (e) {}
+  try { window.vocabLocalStorage.setItem(EXAM_KEY, JSON.stringify(examState)); } catch (e) {}
 }
 function restoreExamState() {
   try {
-    const raw = localStorage.getItem(EXAM_KEY);
+    const raw = window.vocabLocalStorage.getItem(EXAM_KEY);
     if (!raw) return;
     const st = JSON.parse(raw);
     if (!st || !st.phase) return;

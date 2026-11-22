@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 from . import views
 
@@ -69,15 +70,7 @@ urlpatterns = [
     path('api/study-duration/', views.api_study_duration, name='api_study_duration'),
     path('api/export/pdf/', views.api_export_pdf, name='api_export_pdf'),
     path('api/backup/', views.api_backup, name='api_backup'),
-    path('api/backup/prepare/', views.api_backup_prepare, name='api_backup_prepare'),
-    path('api/backup/dir/', views.api_backup_dir, name='api_backup_dir'),
     path('api/privacy/agree/', views.api_privacy_agree, name='api_privacy_agree'),
-    path('api/check-update/', views.api_check_update, name='api_check_update'),
-    path('api/update/download/', views.api_update_download, name='api_update_download'),
-    path('api/update/download/status/', views.api_update_download_status, name='api_update_download_status'),
-    path('api/update/download/cancel/', views.api_update_download_cancel, name='api_update_download_cancel'),
-    path('api/update/result/', views.api_update_result, name='api_update_result'),
-    path('api/update/result/ack/', views.api_update_result_ack, name='api_update_result_ack'),
     path('api/restore/', views.api_restore, name='api_restore'),
     path('api/settings/', views.api_settings, name='api_settings'),
     path('api/note/<int:word_id>/', views.api_note, name='api_note'),
@@ -168,3 +161,15 @@ urlpatterns = [
     path('api/error-patterns/ai-analysis/', views.api_error_patterns_ai_analysis, name='api_error_patterns_ai_analysis'),
     path('api/achievements/', views.api_achievements, name='api_achievements'),
 ]
+
+if not getattr(settings, 'SERVER_MODE', False):
+    urlpatterns += [
+        path('api/backup/prepare/', views.api_backup_prepare, name='api_backup_prepare'),
+        path('api/backup/dir/', views.api_backup_dir, name='api_backup_dir'),
+        path('api/check-update/', views.api_check_update, name='api_check_update'),
+        path('api/update/download/', views.api_update_download, name='api_update_download'),
+        path('api/update/download/status/', views.api_update_download_status, name='api_update_download_status'),
+        path('api/update/download/cancel/', views.api_update_download_cancel, name='api_update_download_cancel'),
+        path('api/update/result/', views.api_update_result, name='api_update_result'),
+        path('api/update/result/ack/', views.api_update_result_ack, name='api_update_result_ack'),
+    ]

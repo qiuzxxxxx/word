@@ -1,0 +1,26 @@
+[Unit]
+Description=Lexizx learning app
+After=network.target
+
+[Service]
+User=lexizx
+Group=lexizx
+WorkingDirectory=/opt/lexizx
+EnvironmentFile=/etc/lexizx.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+ExecStart=/opt/lexizx-venv/bin/gunicorn --bind 127.0.0.1:8765 --workers 2 --worker-class gthread --threads 2 --timeout 360 --graceful-timeout 365 --worker-tmp-dir /dev/shm vocab_project.wsgi:application
+Restart=on-failure
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=375
+MemoryHigh=1536M
+MemoryMax=2304M
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/lexizx
+
+[Install]
+WantedBy=multi-user.target

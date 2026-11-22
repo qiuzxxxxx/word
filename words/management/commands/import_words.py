@@ -29,6 +29,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('json_file', type=str, help='JSON 文件路径')
         parser.add_argument('--clear', action='store_true', help='导入前清空现有数据')
+        parser.add_argument('--skip-ai', action='store_true', help='只导入词库，不调用 AI 补全')
 
     def handle(self, *args, **options):
         json_file = options['json_file']
@@ -116,7 +117,7 @@ class Command(BaseCommand):
             self.stdout.write(f'  List {unit_number}: {unit.words.count()} 个单词')
 
         # 导入后自动 AI 补全（按词性释义 + 例句），失败不影响导入结果
-        if created_words:
+        if created_words and not options['skip_ai']:
             try:
                 ai_complete_words(created_words)
             except Exception:

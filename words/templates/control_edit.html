@@ -1,0 +1,34 @@
+{% extends 'portal_shell.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block portal_nav %}<a class="btn btn-secondary" href="{% url 'site_control' %}"><i class="ph ph-arrow-left" aria-hidden="true"></i> 返回管理端</a>{% endblock %}
+{% block portal %}
+<section class="portal-panel portal-edit{% if section == 'announcement' %} portal-edit--wide{% endif %}" aria-labelledby="edit-title">
+  <h1 id="edit-title">{{ title }}</h1>
+  <form class="portal-form" method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      {% if section == 'announcement' and field.name == 'body' %}
+      <div class="portal-editor" data-announcement-editor data-preview-url="{% url 'announcement_preview' %}">
+        <div class="portal-editor-toolbar">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          <button class="btn btn-secondary" type="button" data-preview-toggle aria-expanded="false" aria-controls="announcement-preview"><i class="ph ph-eye" aria-hidden="true"></i> <span>预览</span></button>
+        </div>
+        <p class="portal-help" id="announcement-hint">支持 Markdown 标题、列表、强调、链接、引用和代码块。</p>
+        <div class="portal-editor-columns">
+          <div class="portal-editor-input">{{ field }}</div>
+          <div class="markdown-body announcement-content portal-rendered" id="announcement-preview" aria-live="polite" hidden></div>
+        </div>
+        {{ field.errors }}
+      </div>
+      {% else %}
+        {% include 'partials/portal_field.html' %}
+      {% endif %}
+    {% endfor %}
+    <div class="portal-form-actions">
+      <a class="btn btn-secondary" href="{% url 'site_control' %}">取消</a>
+      <button class="btn btn-primary" type="submit"><i class="ph ph-check" aria-hidden="true"></i> 保存{% if section == 'announcement' %}公告{% endif %}</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

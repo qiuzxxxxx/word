@@ -550,6 +550,7 @@ class ChatMessage(models.Model):
 
 
 class AIModel(models.Model):
+    shared_model_id = models.PositiveBigIntegerField(null=True, blank=True, unique=True, editable=False)
     """AI 模型配置：集中存储在数据库，由设置页统一管理"""
     provider = models.CharField(max_length=50, default='openai', verbose_name='服务商')
     model_id = models.CharField(max_length=100, verbose_name='模型 ID')

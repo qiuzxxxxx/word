@@ -44,12 +44,12 @@ def create_default_achievements(apps, schema_editor):
     ]
     
     for data in defaults:
-        Achievement.objects.update_or_create(key=data['key'], defaults=data)
+        Achievement.objects.using(schema_editor.connection.alias).update_or_create(key=data['key'], defaults=data)
 
 
 def remove_default_achievements(apps, schema_editor):
     Achievement = apps.get_model('words', 'Achievement')
-    Achievement.objects.filter(
+    Achievement.objects.using(schema_editor.connection.alias).filter(
         key__in=[
             'streak_3', 'streak_7', 'streak_30', 'streak_100',
             'words_100', 'words_500', 'words_1000', 'words_2000',
